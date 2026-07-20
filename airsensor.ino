@@ -466,12 +466,16 @@ static void handleApiSettingsPost() {
     if (!ok) { sendErr(400, ("invalid " + bad).c_str()); return; }
 
     // Idle-only commands needed only if one of these actually changed.
+    // Toggling the ambient-pressure override must also go through the idle
+    // path so setSensorAltitude is re-applied (the SEN66 keeps using the
+    // last ambient pressure otherwise).
     bool needIdle = c.altitude != cfg.altitude || c.asc != cfg.asc
         || c.vocIdxOff != cfg.vocIdxOff || c.vocLearnOff != cfg.vocLearnOff
         || c.vocLearnGain != cfg.vocLearnGain || c.vocGateMax != cfg.vocGateMax
         || c.vocStdInit != cfg.vocStdInit || c.vocGain != cfg.vocGain
         || c.noxIdxOff != cfg.noxIdxOff || c.noxLearnOff != cfg.noxLearnOff
-        || c.noxGateMax != cfg.noxGateMax || c.noxGain != cfg.noxGain;
+        || c.noxGateMax != cfg.noxGateMax || c.noxGain != cfg.noxGain
+        || c.usePressure != cfg.usePressure;
     bool persistTurnedOff = cfg.vocPersist && !c.vocPersist;
 
     cfg = c;
