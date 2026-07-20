@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Air Sensor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" onerror="">
+<style>
+  body{margin:0;background:#0d1117;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#e7ecf2}
+  a{color:#8ab4d8}a:hover{color:#b3d2ec}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  *{-webkit-tap-highlight-color:transparent}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+
+  .wrap{min-height:100vh;display:flex;justify-content:center;background:#0d1117}
+  .page{width:100%;max-width:430px;padding:20px 18px 32px;box-sizing:border-box;display:flex;flex-direction:column;gap:18px}
+
+  .header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .header-titles{display:flex;flex-direction:column;gap:2px}
+  .title{font-size:16px;font-weight:600;letter-spacing:.01em}
+  .updated{font-size:11.5px;color:#7a8595}
+
+  .pill{display:flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;border:1px solid #1f2937;background:transparent}
+  .pill-dot{width:7px;height:7px;border-radius:50%;background:#7a8595}
+  .pill-text{font-size:11.5px;font-weight:500}
+
+  .fault{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:12px;background:rgba(224,110,80,.1);border:1px solid rgba(224,110,80,.35)}
+  .fault-code{font-size:11px;color:#e08a6e;background:rgba(224,110,80,.15);padding:2px 7px;border-radius:5px}
+  .fault-msg{font-size:12.5px;color:#d9c0b6}
+
+  .body{display:flex;flex-direction:column;gap:18px}
+  .right{display:flex;flex-direction:column;gap:18px}
+
+  .hero{cursor:pointer;border-radius:20px;background:#141b24;border:1px solid #1f2937;padding:24px 20px 18px;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .hero:hover{border-color:#2c3b4e}
+  .gauge-box{position:relative;width:230px;height:132px}
+  .hero-readout{display:flex;flex-direction:column;align-items:center;gap:2px;margin-top:-58px}
+  .co2-val{font-size:46px;font-weight:500;line-height:1}
+  .co2-unit{font-size:12px;color:#7a8595;letter-spacing:.04em}
+  .co2-chip{margin-top:8px;font-size:12.5px;font-weight:500;padding:4px 12px;border-radius:999px}
+
+  .pollutant-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .comfort-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .card{cursor:pointer;border-radius:16px;background:#141b24;border:1px solid #1f2937;padding:14px 12px;display:flex;flex-direction:column;gap:8px}
+  .card.comfort{padding:14px 14px}
+  .card:hover{border-color:#2c3b4e}
+  .card-label{font-size:11px;color:#7a8595;letter-spacing:.03em}
+  .card-value-row{display:flex;align-items:baseline;gap:4px}
+  .card-value{font-size:22px;font-weight:500}
+  .card-unit{font-size:10px;color:#7a8595}
+  .bar{height:4px;border-radius:2px;background:#1f2937;overflow:hidden}
+  .bar-fill{height:100%;border-radius:2px;width:0%}
+  .card-band{font-size:10px;font-weight:500}
+
+  .section{display:flex;flex-direction:column;gap:8px}
+  .section-label{font-size:11px;font-weight:600;color:#7a8595;letter-spacing:.08em;text-transform:uppercase;padding:0 2px}
+  .list{border-radius:16px;background:#141b24;border:1px solid #1f2937;overflow:hidden}
+  .list-row{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;min-height:44px;box-sizing:border-box;border-bottom:1px solid #1c2530}
+  .list-row:last-child{border-bottom:none}
+  .list-row:hover{background:#18202b}
+  .list-row-left{display:flex;align-items:baseline;gap:8px}
+  .list-name{font-size:13.5px;color:#c2ccd8}
+  .list-desc{font-size:10.5px;color:#5a6675}
+  .list-row-right{display:flex;align-items:baseline;gap:5px}
+  .list-value{font-size:15px;font-weight:500;color:#e7ecf2}
+  .list-unit{font-size:10px;color:#7a8595;min-width:36px;text-align:left}
+
+  .footer{display:flex;justify-content:center;padding-top:4px}
+  .footer a{font-size:11px;color:#5a6675;text-decoration:none}
+  .footer a:hover{color:#8ab4d8}
+
+  .overlay{position:fixed;inset:0;background:rgba(5,8,12,.72);backdrop-filter:blur(3px);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+  .sheet{width:100%;max-width:430px;background:#151d27;border:1px solid #24303f;border-bottom:none;border-radius:22px 22px 0 0;padding:20px 20px 30px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px}
+  .sheet-grip{width:38px;height:4px;border-radius:2px;background:#2c3b4e;align-self:center}
+  .sheet-head{display:flex;align-items:center;justify-content:space-between}
+  .sheet-title{font-size:15px;font-weight:600}
+  .sheet-desc{font-size:11.5px;color:#7a8595}
+  .sheet-val{font-size:26px;font-weight:500}
+  .sheet-unit{font-size:11px;color:#7a8595}
+  .chart-box{border-radius:14px;background:#101720;border:1px solid #1f2937;padding:14px 14px 8px}
+  .chart-label{font-size:10.5px;color:#7a8595;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px}
+  .chart-axis{display:flex;justify-content:space-between;font-size:9.5px;color:#5a6675;padding:6px 2px 4px}
+  .stats{display:flex;gap:10px}
+  .stat{flex:1;border-radius:12px;background:#101720;border:1px solid #1f2937;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+  .stat-label{font-size:10px;color:#7a8595;text-transform:uppercase;letter-spacing:.05em}
+  .stat-val{font-size:15px;color:#c2ccd8}
+
+  [hidden]{display:none !important}
+
+  @media (min-width:700px){
+    .page{max-width:920px;padding:28px 24px 24px}
+    .body{display:grid;grid-template-columns:380px 1fr;gap:18px;align-items:stretch}
+    .right{gap:12px}
+    .hero{justify-content:center}
+    .overlay{align-items:center;justify-content:center;padding:24px}
+    .sheet{border-bottom:1px solid #24303f;border-radius:22px;padding:20px}
+    .sheet-grip{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="page">
+
+  <!-- header + sensor state -->
+  <div class="header">
+    <div class="header-titles">
+      <div class="title">Air Sensor</div>
+      <div class="updated" id="updated">Updated &mdash;</div>
+    </div>
+    <div class="pill" id="pill">
+      <span class="pill-dot" id="pillDot"></span>
+      <span class="pill-text" id="pillText">Offline</span>
+    </div>
+  </div>
+
+  <!-- fault banner -->
+  <div class="fault" id="fault" hidden>
+    <span class="fault-code mono" id="faultCode">E-217</span>
+    <span class="fault-msg" id="faultMsg">Sensor fault</span>
+  </div>
+
+  <!-- two-column body -->
+  <div class="body">
+
+    <!-- hero CO2 gauge -->
+    <div class="hero" onclick="openDetail('co2')">
+      <div class="gauge-box" id="gauge"></div>
+      <div class="hero-readout">
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span class="co2-val mono" id="co2Val">&mdash;</span>
+        </div>
+        <div class="co2-unit">CO&#8322; &middot; ppm</div>
+        <div class="co2-chip" id="co2Chip">&mdash;</div>
+      </div>
+    </div>
+
+    <!-- right column -->
+    <div class="right">
+
+      <!-- pollutant row: PM2.5 / VOC / NOx -->
+      <div class="pollutant-row">
+        <div class="card" onclick="openDetail('pm25')">
+          <div class="card-label">PM2.5</div>
+          <div class="card-value-row">
+            <span class="card-value mono" id="pm25Val">&mdash;</span>
+            <span class="card-unit">&micro;g/m&sup3;</span>
+          </div>
+          <div class="bar"><div class="bar-fill" id="pm25Bar"></div></div>
+          <div class="card-band" id="pm25Band"></div>
+        </div>
+        <div class="card" onclick="openDetail('voc')">
+          <div class="card-label">VOC</div>
+          <div class="card-value-row">
+            <span class="card-value mono" id="vocVal">&mdash;</span>
+            <span class="card-unit">idx</span>
+          </div>
+          <div class="bar"><div class="bar-fill" id="vocBar"></div></div>
+          <div class="card-band" id="vocBand"></div>
+        </div>
+        <div class="card" onclick="openDetail('nox')">
+          <div class="card-label">NOx</div>
+          <div class="card-value-row">
+            <span class="card-value mono" id="noxVal">&mdash;</span>
+            <span class="card-unit">idx</span>
+          </div>
+          <div class="bar"><div class="bar-fill" id="noxBar"></div></div>
+          <div class="card-band" id="noxBand"></div>
+        </div>
+      </div>
+
+      <!-- comfort row: Temp / Humidity -->
+      <div class="comfort-row">
+        <div class="card comfort" onclick="openDetail('temp')">
+          <div class="card-label">Temperature</div>
+          <div class="card-value-row">
+            <span class="card-value mono" id="tempVal" style="color:#e7ecf2">&mdash;</span>
+            <span class="card-unit">&deg;C</span>
+          </div>
+          <div class="bar"><div class="bar-fill" id="tempBar" style="background:#5b7d9e"></div></div>
+        </div>
+        <div class="card comfort" onclick="openDetail('hum')">
+          <div class="card-label">Humidity</div>
+          <div class="card-value-row">
+            <span class="card-value mono" id="humVal" style="color:#e7ecf2">&mdash;</span>
+            <span class="card-unit">%</span>
+          </div>
+          <div class="bar"><div class="bar-fill" id="humBar" style="background:#5b7d9e"></div></div>
+        </div>
+      </div>
+
+      <!-- secondary metrics -->
+      <div class="section">
+        <div class="section-label">Particulate detail</div>
+        <div class="list">
+          <div class="list-row" onclick="openDetail('pm1')">
+            <div class="list-row-left"><span class="list-name">PM1</span><span class="list-desc">Ultrafine particles</span></div>
+            <div class="list-row-right"><span class="list-value mono" id="pm1Val">&mdash;</span><span class="list-unit">&micro;g/m&sup3;</span></div>
+          </div>
+          <div class="list-row" onclick="openDetail('pm4')">
+            <div class="list-row-left"><span class="list-name">PM4</span><span class="list-desc">Coarse particles</span></div>
+            <div class="list-row-right"><span class="list-value mono" id="pm4Val">&mdash;</span><span class="list-unit">&micro;g/m&sup3;</span></div>
+          </div>
+          <div class="list-row" onclick="openDetail('pm10')">
+            <div class="list-row-left"><span class="list-name">PM10</span><span class="list-desc">Large particles</span></div>
+            <div class="list-row-right"><span class="list-value mono" id="pm10Val">&mdash;</span><span class="list-unit">&micro;g/m&sup3;</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /right column -->
+  </div><!-- /two-column body -->
+
+  <!-- footer -->
+  <div class="footer">
+    <a href="/admin">Maintenance</a>
+  </div>
+
+  <!-- detail overlay -->
+  <div class="overlay" id="overlay" hidden onclick="closeDetail()">
+    <div class="sheet" onclick="event.stopPropagation()">
+      <div class="sheet-grip"></div>
+      <div class="sheet-head">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <div class="sheet-title" id="detailName">&mdash;</div>
+          <div class="sheet-desc" id="detailDesc">&mdash;</div>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:5px">
+          <span class="sheet-val mono" id="detailVal">&mdash;</span>
+          <span class="sheet-unit" id="detailUnit"></span>
+        </div>
+      </div>
+      <div class="chart-box">
+        <div class="chart-label">Last 24 hours</div>
+        <div id="detailChart"></div>
+        <div class="chart-axis mono">
+          <span>-24h</span><span>-18h</span><span>-12h</span><span>-6h</span><span>now</span>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="stat-label">24h min</span><span class="stat-val mono" id="detailMin">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">24h avg</span><span class="stat-val mono" id="detailAvg">&mdash;</span></div>
+        <div class="stat"><span class="stat-label">24h max</span><span class="stat-val mono" id="detailMax">&mdash;</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+"use strict";
+var POLL_MS = 5000;
+var fails = 0, lastData = null, lastOkAt = 0, detailKey = null, historyData = null;
+
+function el(id){ return document.getElementById(id); }
+function isNum(v){ return v !== null && v !== undefined && typeof v === 'number' && !isNaN(v); }
+function fmt(v, dec){ return isNum(v) ? v.toFixed(dec) : '—'; }
+function pctStr(v, scale){ return isNum(v) ? Math.min(100, Math.max(0, v / scale * 100)).toFixed(0) + '%' : '0%'; }
+
+// ---- bands (ported 1:1 from the design) ----
+function co2Band(v){
+  if (v < 800)  return { label: 'Good',       color: '#4fc98f' };
+  if (v < 1000) return { label: 'Acceptable', color: '#a8c957' };
+  if (v < 1500) return { label: 'Elevated',   color: '#e0b34f' };
+  if (v < 2000) return { label: 'Poor',       color: '#e08a4f' };
+  return { label: 'Very poor', color: '#e06e5b' };
+}
+function pm25Band(v){
+  if (v < 12) return '#4fc98f';
+  if (v < 35) return '#e0b34f';
+  return '#e06e5b';
+}
+function idxBand(v){
+  if (v < 150) return { label: 'Normal',   color: '#4fc98f' };
+  if (v < 300) return { label: 'Elevated', color: '#e0b34f' };
+  return { label: 'High', color: '#e06e5b' };
+}
+
+var states = {
+  online:      { label: 'Online',      dot: '#4fc98f', text: '#8fd9b5', bg: 'rgba(79,201,143,.08)',  border: 'rgba(79,201,143,.25)', anim: 'none' },
+  warmup:      { label: 'Warming up',  dot: '#e0b34f', text: '#e5cb8d', bg: 'rgba(224,179,79,.08)',  border: 'rgba(224,179,79,.28)', anim: 'pulse 1.6s ease-in-out infinite' },
+  calibrating: { label: 'Calibrating', dot: '#5b9ee0', text: '#9ec4e8', bg: 'rgba(91,158,224,.08)',  border: 'rgba(91,158,224,.28)', anim: 'pulse 1.6s ease-in-out infinite' },
+  offline:     { label: 'Offline',     dot: '#7a8595', text: '#9aa5b3', bg: 'rgba(122,133,149,.08)', border: 'rgba(122,133,149,.28)', anim: 'none' },
+  fault:       { label: 'Fault',       dot: '#e06e5b', text: '#e8a294', bg: 'rgba(224,110,91,.08)',  border: 'rgba(224,110,91,.3)',  anim: 'pulse 1.2s ease-in-out infinite' }
+};
+
+// ---- fault flag mapping ----
+function faultInfo(flags){
+  if (flags & (1 << 4))  return { code: 'E-FAN', msg: 'Fan failure — check the air inlet' };
+  if (flags & (1 << 11)) return { code: 'E-PM',  msg: 'PM sensor error' };
+  if (flags & (1 << 6))  return { code: 'E-RHT', msg: 'Temperature/humidity sensor error' };
+  if (flags & (1 << 7))  return { code: 'E-GAS', msg: 'VOC/NOx sensor error' };
+  if (flags & ((1 << 9) | (1 << 12))) return { code: 'E-CO2', msg: 'CO2 sensor error' };
+  if (flags & (1 << 21)) return { code: 'W-SPD', msg: 'Fan speed out of range' };
+  return { code: 'E-217', msg: 'Sensor fault' };
+}
+
+// ---- gauge: 220 deg arc, 400-2400 ppm, r=96, stroke 10 (ported to SVG string) ----
+function gaugeEl(v, color){
+  var min = 400, max = 2400, frac = Math.min(1, Math.max(0, (v - min) / (max - min)));
+  var cx = 115, cy = 115, r = 96, a0 = -200, a1 = 20;
+  function pt(deg){ var rad = deg * Math.PI / 180; return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)]; }
+  function arc(from, to){
+    var p0 = pt(from), p1 = pt(to);
+    return 'M ' + p0[0].toFixed(1) + ' ' + p0[1].toFixed(1) +
+           ' A ' + r + ' ' + r + ' 0 ' + (to - from > 180 ? 1 : 0) + ' 1 ' +
+           p1[0].toFixed(1) + ' ' + p1[1].toFixed(1);
+  }
+  var aV = a0 + frac * (a1 - a0);
+  var tip = pt(aV);
+  return '<svg viewBox="0 0 230 132" style="width:100%;height:100%;display:block;overflow:visible">' +
+           '<path d="' + arc(a0, a1) + '" fill="none" stroke="#1f2937" stroke-width="10" stroke-linecap="round"></path>' +
+           '<path d="' + arc(a0, Math.max(a0 + 0.5, aV)) + '" fill="none" stroke="' + color + '" stroke-width="10" stroke-linecap="round" style="transition:all .6s ease"></path>' +
+           '<circle cx="' + tip[0].toFixed(1) + '" cy="' + tip[1].toFixed(1) + '" r="7" fill="#0d1117" stroke="' + color + '" stroke-width="3"></circle>' +
+         '</svg>';
+}
+
+// ---- chart: 48-point 24h series; null breaks the line into segments ----
+function chartEl(pts, color){
+  var w = 340, h = 110;
+  var svgOpen = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:auto;display:block">';
+  if (!pts || !pts.length) return svgOpen + '</svg>';
+  var vals = pts.filter(isNum);
+  if (!vals.length) return svgOpen + '</svg>';
+  var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals), span = (max - min) || 1;
+  var step = w / (pts.length - 1);
+  function y(v){ return h - 8 - ((v - min) / span) * (h - 20); }
+  var line = '', area = '', seg = [], lastPt = null;
+  function flush(){
+    if (!seg.length) return;
+    line += seg.map(function(p, i){ return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ') + ' ';
+    area += 'M ' + seg[0][0].toFixed(1) + ' ' + h + ' ' +
+            seg.map(function(p){ return 'L ' + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ') +
+            ' L ' + seg[seg.length - 1][0].toFixed(1) + ' ' + h + ' Z ';
+    seg = [];
+  }
+  pts.forEach(function(v, i){
+    if (!isNum(v)) { flush(); return; }
+    var p = [i * step, y(v)];
+    seg.push(p);
+    lastPt = p;
+  });
+  flush();
+  var dot = lastPt ? '<circle cx="' + lastPt[0].toFixed(1) + '" cy="' + lastPt[1].toFixed(1) + '" r="3.5" fill="' + color + '"></circle>' : '';
+  return svgOpen +
+    '<defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.28"></stop>' +
+      '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"></stop>' +
+    '</linearGradient></defs>' +
+    '<path d="' + area + '" fill="url(#ag)"></path>' +
+    '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round"></path>' +
+    dot + '</svg>';
+}
+
+// ---- metric metadata (name/desc/unit/color/decimals) ----
+function defs(M){
+  var co2c = isNum(M.co2)  ? co2Band(M.co2).color   : '#7a8595';
+  var pmc  = isNum(M.pm25) ? pm25Band(M.pm25)        : '#5b7d9e';
+  var vocc = isNum(M.voc)  ? idxBand(M.voc).color     : '#5b7d9e';
+  var noxc = isNum(M.nox)  ? idxBand(M.nox * 3).color : '#5b7d9e';
+  return {
+    co2:  { name: 'CO₂', desc: 'Carbon dioxide',    value: M.co2,  unit: 'ppm',    color: co2c,      dec: 0 },
+    pm25: { name: 'PM2.5',    desc: 'Fine particles',    value: M.pm25, unit: 'µg/m³', color: pmc, dec: 1 },
+    temp: { name: 'Temperature', desc: 'Ambient temperature', value: M.temp, unit: '°C', color: '#5b7d9e', dec: 1 },
+    hum:  { name: 'Humidity', desc: 'Relative humidity',  value: M.hum,  unit: '%',      color: '#5b7d9e', dec: 0 },
+    voc:  { name: 'VOC',      desc: 'Volatile organics',  value: M.voc,  unit: 'index',  color: vocc,      dec: 0 },
+    nox:  { name: 'NOx',      desc: 'Nitrogen oxides',    value: M.nox,  unit: 'index',  color: noxc,      dec: 0 },
+    pm1:  { name: 'PM1',      desc: 'Ultrafine particles',value: M.pm1,  unit: 'µg/m³', color: '#5b7d9e', dec: 1 },
+    pm4:  { name: 'PM4',      desc: 'Coarse particles',   value: M.pm4,  unit: 'µg/m³', color: '#5b7d9e', dec: 1 },
+    pm10: { name: 'PM10',     desc: 'Large particles',    value: M.pm10, unit: 'µg/m³', color: '#5b7d9e', dec: 1 }
+  };
+}
+
+// ---- data logic ----
+function effState(){
+  if (fails >= 3) return 'offline';
+  if (!lastData) return 'offline';
+  return lastData.state || 'offline';
+}
+function lastUpdateText(){
+  if (!lastOkAt) return '—';
+  var s = Math.floor((Date.now() - lastOkAt) / 1000);
+  if (s < 10) return 'just now';
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  return Math.floor(s / 3600) + 'h ago';
+}
+
+function setBand(valId, barId, bandId, value, color, barScale, bandLabel){
+  el(valId).textContent = value;
+  el(valId).style.color = color;
+  el(barId).style.width = barScale;
+  el(barId).style.background = color;
+  el(bandId).textContent = bandLabel;
+  el(bandId).style.color = color;
+}
+
+function render(){
+  var M = lastData || {};
+  var es = effState();
+  var st = states[es] || states.offline;
+
+  el('updated').textContent = 'Updated ' + lastUpdateText();
+
+  var pill = el('pill');
+  pill.style.borderColor = st.border;
+  pill.style.background = st.bg;
+  var dot = el('pillDot');
+  dot.style.background = st.dot;
+  if (dot.dataset.anim !== st.anim) { dot.style.animation = st.anim; dot.dataset.anim = st.anim; }
+  el('pillText').style.color = st.text;
+  el('pillText').textContent = st.label;
+
+  var flags = (typeof M.faultFlags === 'number') ? M.faultFlags : 0;
+  var showFault = es === 'fault' || flags !== 0;
+  if (showFault) {
+    var fi = faultInfo(flags);
+    el('faultCode').textContent = fi.code;
+    el('faultMsg').textContent = fi.msg;
+    el('fault').hidden = false;
+  } else {
+    el('fault').hidden = true;
+  }
+
+  // CO2 gauge
+  var co2 = isNum(M.co2) ? M.co2 : null;
+  var co2c = co2 === null ? '#7a8595' : co2Band(co2).color;
+  var co2l = co2 === null ? '—' : co2Band(co2).label;
+  el('gauge').innerHTML = gaugeEl(co2 === null ? 400 : co2, co2c);
+  el('co2Val').textContent = fmt(co2, 0);
+  el('co2Val').style.color = co2c;
+  var chip = el('co2Chip');
+  chip.textContent = co2l;
+  chip.style.color = co2c;
+  chip.style.background = co2c + '1f';
+
+  // pollutants
+  var pm25 = isNum(M.pm25) ? M.pm25 : null;
+  var pm25c = pm25 === null ? '#5b7d9e' : pm25Band(pm25);
+  setBand('pm25Val', 'pm25Bar', 'pm25Band', fmt(pm25, 1), pm25c, pctStr(pm25, 55),
+          pm25 === null ? '' : (pm25 < 12 ? 'Good' : pm25 < 35 ? 'Moderate' : 'Unhealthy'));
+
+  var voc = isNum(M.voc) ? M.voc : null;
+  var vocB = voc === null ? null : idxBand(voc);
+  setBand('vocVal', 'vocBar', 'vocBand', fmt(voc, 0), vocB ? vocB.color : '#5b7d9e', pctStr(voc, 500), vocB ? vocB.label : '');
+
+  var nox = isNum(M.nox) ? M.nox : null;
+  var noxB = nox === null ? null : idxBand(nox * 3);
+  setBand('noxVal', 'noxBar', 'noxBand', fmt(nox, 0), noxB ? noxB.color : '#5b7d9e', pctStr(nox, 150), noxB ? noxB.label : '');
+
+  // comfort
+  var temp = isNum(M.temp) ? M.temp : null;
+  el('tempVal').textContent = fmt(temp, 1);
+  el('tempBar').style.width = temp === null ? '0%' : Math.min(100, Math.max(0, (temp - 10) / 25 * 100)).toFixed(0) + '%';
+
+  var hum = isNum(M.hum) ? M.hum : null;
+  el('humVal').textContent = fmt(hum, 0);
+  el('humBar').style.width = hum === null ? '0%' : Math.min(100, Math.max(0, hum)).toFixed(0) + '%';
+
+  // secondary list
+  el('pm1Val').textContent = fmt(isNum(M.pm1) ? M.pm1 : null, 1);
+  el('pm4Val').textContent = fmt(isNum(M.pm4) ? M.pm4 : null, 1);
+  el('pm10Val').textContent = fmt(isNum(M.pm10) ? M.pm10 : null, 1);
+
+  // keep detail header live
+  if (detailKey) renderDetailHeader();
+}
+
+// ---- detail overlay ----
+function renderDetailHeader(){
+  var d = defs(lastData || {})[detailKey];
+  if (!d) return;
+  el('detailName').textContent = d.name;
+  el('detailDesc').textContent = d.desc;
+  el('detailVal').textContent = fmt(isNum(d.value) ? d.value : null, d.dec);
+  el('detailVal').style.color = d.color;
+  el('detailUnit').textContent = d.unit;
+}
+function renderDetailChart(){
+  if (!detailKey) return;
+  var d = defs(lastData || {})[detailKey];
+  var series = (historyData && historyData.series) ? historyData.series[detailKey] : null;
+  el('detailChart').innerHTML = chartEl(series, d.color);
+  var vals = (series || []).filter(isNum);
+  if (vals.length) {
+    el('detailMin').textContent = fmt(Math.min.apply(null, vals), d.dec);
+    el('detailMax').textContent = fmt(Math.max.apply(null, vals), d.dec);
+    el('detailAvg').textContent = fmt(vals.reduce(function(a, b){ return a + b; }, 0) / vals.length, d.dec);
+  } else {
+    el('detailMin').textContent = '—';
+    el('detailAvg').textContent = '—';
+    el('detailMax').textContent = '—';
+  }
+}
+function openDetail(key){
+  detailKey = key;
+  el('overlay').hidden = false;
+  renderDetailHeader();
+  el('detailChart').innerHTML = chartEl([], defs(lastData || {})[key].color);
+  el('detailMin').textContent = '—';
+  el('detailAvg').textContent = '—';
+  el('detailMax').textContent = '—';
+  fetch('/api/history').then(function(r){
+    if (!r.ok) throw new Error('bad');
+    return r.json();
+  }).then(function(j){
+    historyData = j;
+    if (detailKey === key) renderDetailChart();
+  }).catch(function(){
+    historyData = null;
+    if (detailKey === key) renderDetailChart();
+  });
+}
+function closeDetail(){
+  detailKey = null;
+  historyData = null;
+  el('overlay').hidden = true;
+}
+window.openDetail = openDetail;
+window.closeDetail = closeDetail;
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeDetail(); });
+
+// ---- polling ----
+function poll(){
+  fetch('/api/data').then(function(r){
+    if (!r.ok) throw new Error('bad');
+    return r.json();
+  }).then(function(j){
+    lastData = j; lastOkAt = Date.now(); fails = 0;
+  }).catch(function(){
+    fails++;
+  }).then(function(){
+    render();
+  });
+}
+setInterval(poll, POLL_MS);
+setInterval(function(){ el('updated').textContent = 'Updated ' + lastUpdateText(); }, 1000);
+poll();
+render();
+</script>
+</body>
+</html>
