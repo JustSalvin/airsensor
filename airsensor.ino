@@ -51,7 +51,6 @@ static constexpr uint32_t WARMUP_NOX_MS      = 6UL * 60 * 60 * 1000;
 static constexpr uint32_t MIN_RUN_BEFORE_FRC = 3UL * 60 * 1000;
 static constexpr time_t   FAN_CLEAN_PERIOD_S = 7UL  * 24 * 3600;   // weekly
 static constexpr time_t   SHT_HEAT_PERIOD_S  = 30UL * 24 * 3600;   // monthly
-static constexpr uint32_t VOC_SAVE_MS        = 60UL * 60 * 1000;   // hourly
 static constexpr time_t   TIME_VALID_AFTER   = 1700000000;
 
 enum class SensorState { BOOT, WARMUP, GAS_CALIBRATION, READY, FAULT };
@@ -89,7 +88,6 @@ struct Settings {
     uint16_t pressure    = 1013;     // hPa, 700-1200
     float    tempOffset  = 0.0f;     // degC, firmware scales x200
     float    tempSlope   = 0.0f;     // normalized, firmware scales x10000
-    bool     vocPersist  = true;     // auto save/restore VOC learning state
     bool     asc         = true;     // CO2 automatic self calibration
     uint16_t frcTarget   = 420;      // ppm used by the FRC command
     int16_t  vocIdxOff = 100, vocLearnOff = 12, vocLearnGain = 12,
@@ -184,7 +182,6 @@ static void loadSettings() {
     cfg.pressure    = prefs.getUShort("press",    cfg.pressure);
     cfg.tempOffset  = prefs.getFloat ("tOff",     cfg.tempOffset);
     cfg.tempSlope   = prefs.getFloat ("tSlope",   cfg.tempSlope);
-    cfg.vocPersist  = prefs.getBool  ("vocPersist", cfg.vocPersist);
     cfg.asc         = prefs.getBool  ("asc",      cfg.asc);
     cfg.frcTarget   = prefs.getUShort("frcTarget", cfg.frcTarget);
     cfg.vocIdxOff   = prefs.getShort ("vocIdxOff",  cfg.vocIdxOff);
@@ -197,12 +194,16 @@ static void loadSettings() {
     cfg.noxLearnOff = prefs.getShort ("noxLearnOff", cfg.noxLearnOff);
     cfg.noxGateMax  = prefs.getShort ("noxGateMax", cfg.noxGateMax);
     cfg.noxGain     = prefs.getShort ("noxGain",   cfg.noxGain);
+
+    // NVS hygiene: remove leftovers from the retired VOC learning-state
+    // persistence feature (VOC now recalibrates on every boot, like NOx).
+    prefs.remove("vocState"); prefs.remove("vocPersist");
 }
 static void saveSettings() {
     prefs.putUShort("alt", cfg.altitude);      prefs.putBool("usePress", cfg.usePressure);
     prefs.putUShort("press", cfg.pressure);
     prefs.putFloat("tOff", cfg.tempOffset);    prefs.putFloat("tSlope", cfg.tempSlope);
-    prefs.putBool("vocPersist", cfg.vocPersist); prefs.putBool("asc", cfg.asc);
+    prefs.putBool("asc", cfg.asc);
     prefs.putUShort("frcTarget", cfg.frcTarget);
     prefs.putShort("vocIdxOff", cfg.vocIdxOff);  prefs.putShort("vocLearnOff", cfg.vocLearnOff);
     prefs.putShort("vocLearnGain", cfg.vocLearnGain); prefs.putShort("vocGateMax", cfg.vocGateMax);
@@ -241,14 +242,6 @@ static bool applyAnyStateSettings() {
     return ok;
 }
 
-static void saveVocState() {
-    if (!cfg.vocPersist) return;
-    if (state != SensorState::READY && state != SensorState::GAS_CALIBRATION) return;
-    uint8_t st[8];
-    if (check(sensor.getVocAlgorithmState(st, sizeof st), "getVocAlgorithmState()"))
-        prefs.putBytes("vocState", st, sizeof st);
-}
-
 // ------------------------------------------------------------
 //  Sensor lifecycle
 // ------------------------------------------------------------
@@ -267,13 +260,6 @@ static bool startSensor() {
     // whether the sensor accepts them, so results are intentionally ignored here.
     (void)applyIdleSettings();
     (void)applyAnyStateSettings();
-
-    if (cfg.vocPersist && prefs.getBytesLength("vocState") == 8) {
-        uint8_t st[8];
-        prefs.getBytes("vocState", st, sizeof st);
-        if (check(sensor.setVocAlgorithmState(st, sizeof st), "setVocAlgorithmState()"))
-            Serial.println("VOC learning state restored.");
-    }
 
     if (!check(sensor.startContinuousMeasurement(), "startContinuousMeasurement()"))
         return false;
@@ -402,7 +388,6 @@ static void handleApiSettingsGet() {
     s += "\"pressure\":"; s += String(cfg.pressure); s += ',';
     s += "\"tempOffset\":"; s += String(cfg.tempOffset, 3); s += ',';
     s += "\"tempSlope\":"; s += String(cfg.tempSlope, 3); s += ',';
-    s += "\"vocPersist\":"; s += (cfg.vocPersist ? "true" : "false"); s += ',';
     s += "\"asc\":"; s += (cfg.asc ? "true" : "false"); s += ',';
     s += "\"frcTarget\":"; s += String(cfg.frcTarget); s += ',';
     s += "\"vocIdxOff\":"; s += String(cfg.vocIdxOff); s += ',';
@@ -462,7 +447,6 @@ static void handleApiSettingsPost() {
            && argI16("noxGateMax",  c.noxGateMax, 0, 3000, bad)
            && argI16("noxGain",     c.noxGain, 1, 1000, bad);
     argB("usePressure", c.usePressure);
-    argB("vocPersist",  c.vocPersist);
     argB("asc",         c.asc);
     if (!ok) { sendErr(400, ("invalid " + bad).c_str()); return; }
 
@@ -477,11 +461,9 @@ static void handleApiSettingsPost() {
         || c.noxIdxOff != cfg.noxIdxOff || c.noxLearnOff != cfg.noxLearnOff
         || c.noxGateMax != cfg.noxGateMax || c.noxGain != cfg.noxGain
         || c.usePressure != cfg.usePressure;
-    bool persistTurnedOff = cfg.vocPersist && !c.vocPersist;
 
     cfg = c;
     saveSettings();
-    if (persistTurnedOff) prefs.remove("vocState");   // key defined in Task 4
     bool applied;
     if (needIdle) {
         pauseMeasurement();
@@ -527,13 +509,6 @@ static void handleApiCmd() {
         if (!ok) { sendErr(500, "FRC failed"); return; }
         String s = "{\"ok\":true,\"correction\":"; s += String((int)corr - 0x8000); s += '}';
         server.send(200, "application/json", s);
-    } else if (cmd == "voc_reset") {
-        // Lose only VOC/NOx learning; keep every persisted setting.
-        publishStatusText("Resetting VOC learning...");
-        prefs.remove("vocState");
-        pauseMeasurement();
-        restartAfterDeviceReset();
-        sendOk();
     } else if (cmd == "reset_learning") {
         // Tuning back to defaults + learning wiped; maintenance dates kept.
         publishStatusText("Resetting learning...");
@@ -546,7 +521,6 @@ static void handleApiCmd() {
         cfg.noxIdxOff  = fresh.noxIdxOff;  cfg.noxLearnOff = fresh.noxLearnOff;
         cfg.noxGateMax = fresh.noxGateMax; cfg.noxGain = fresh.noxGain;
         saveSettings();
-        prefs.remove("vocState");
         pauseMeasurement();
         restartAfterDeviceReset();
         sendOk();
@@ -689,9 +663,8 @@ void setup() {
 void loop() {
     server.handleClient();
     histTick();
-    static uint32_t tSend = 0, tMaint = 0, tVoc = 0;
+    static uint32_t tSend = 0, tMaint = 0;
     uint32_t now = millis();
     if (now - tSend  >= SEND_INTERVAL_MS) { tSend  = now; sendData(); }
     if (now - tMaint >= MAINT_CHECK_MS)   { tMaint = now; runMaintenanceIfDue(); }
-    if (now - tVoc   >= VOC_SAVE_MS)      { tVoc   = now; saveVocState(); }
 }

@@ -153,12 +153,7 @@
       <div class="card">
         <div class="card-label">VOC tuning</div>
         <div id="vocFields"></div>
-        <div class="toggle-row">
-          <span class="row-label">Persist VOC learning</span>
-          <div class="toggle" id="pvToggle" onclick="toggleKey('persistVoc')"><div class="knob" id="pvKnob"></div></div>
-        </div>
-        <div class="actions">
-          <button class="btn btn-danger" onclick="askVocReset()">Reset VOC learning</button>
+        <div class="actions end">
           <button class="btn btn-primary" id="saveVoc" onclick="saveSection('voc')" disabled>Save</button>
         </div>
       </div>
@@ -249,15 +244,14 @@ var API = {
   frcTarget:'frcTarget', asc:'asc',
   altitude:'altitude', usePressure:'usePressure', pressure:'pressure', tOffset:'tempOffset', tSlope:'tempSlope',
   vocOffset:'vocIdxOff', vocLearnOffset:'vocLearnOff', vocLearnGain:'vocLearnGain', vocGating:'vocGateMax', vocStd:'vocStdInit', vocGain:'vocGain',
-  noxOffset:'noxIdxOff', noxLearnOffset:'noxLearnOff', noxGating:'noxGateMax', noxGain:'noxGain',
-  persistVoc:'vocPersist'
+  noxOffset:'noxIdxOff', noxLearnOffset:'noxLearnOff', noxGating:'noxGateMax', noxGain:'noxGain'
 };
-var BOOLS = { asc:1, usePressure:1, persistVoc:1 };
+var BOOLS = { asc:1, usePressure:1 };
 
 var SECTIONS = {
   co2: { keys:['frcTarget','asc'],                                                        btn:'saveCo2' },
   env: { keys:['altitude','usePressure','pressure','tOffset','tSlope'],                   btn:'saveEnv' },
-  voc: { keys:['vocOffset','vocLearnOffset','vocLearnGain','vocGating','vocStd','vocGain','persistVoc'], btn:'saveVoc' },
+  voc: { keys:['vocOffset','vocLearnOffset','vocLearnGain','vocGating','vocStd','vocGain'], btn:'saveVoc' },
   nox: { keys:['noxOffset','noxLearnOffset','noxGating','noxGain'],                        btn:'saveNox' }
 };
 
@@ -286,8 +280,7 @@ var NOX_FIELDS  = [
 
 var TOGGLES = {
   asc:        { track:'ascToggle',  knob:'ascKnob'  },
-  usePressure:{ track:'presToggle', knob:'presKnob' },
-  persistVoc: { track:'pvToggle',   knob:'pvKnob'   }
+  usePressure:{ track:'presToggle', knob:'presKnob' }
 };
 
 var FLAG_DEFS = [
@@ -460,15 +453,6 @@ function askCo2Reset(){
     'Reset', function(){
       runCmd('co2_factory_reset', { btn:null }, 30000, function(){
         showToast('success', 'CO₂ calibration reset to factory'); resync(null);
-      });
-    });
-}
-function askVocReset(){
-  openConfirm('Reset VOC learning?',
-    'The VOC baseline learned over the past days will be cleared. The index will need ~12 h to settle again.',
-    'Reset', function(){
-      runCmd('voc_reset', { btn:null }, 30000, function(){
-        showToast('success', 'VOC learning cleared'); resync(null);
       });
     });
 }

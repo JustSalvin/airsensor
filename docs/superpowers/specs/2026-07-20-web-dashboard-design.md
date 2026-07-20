@@ -22,9 +22,10 @@ vincono i mockup — eccetto: nessun nome stanza (titoli fissi "Air Sensor").
   servizi esterni scartati per scelta). La logica `checkAlert`/isteresi e le
   soglie di allerta vengono rimosse: i colori delle bande nella UI sono fissi,
   come nel design.
-- Il backup/ripristino del learning VOC è **automatico** (nessuna azione
-  manuale di salvataggio/ripristino); in `/admin` sono esposti solo un toggle
-  on/off della persistenza e un reset dell'apprendimento.
+- **Nessuna persistenza dello stato VOC** (decisione utente 2026-07-20, che
+  supera la versione precedente di questa spec): VOC si ricomporta come NOx —
+  si ricalibra a ogni riavvio, niente salvataggio/ripristino, nessun controllo
+  in `/admin`. Lo stato "Calibrating" (finestra 6 h) copre entrambi i gas.
 - Nessun HTTPS, nessuna autenticazione (rete domestica fidata).
 - Nessuno storico persistente: il buffer 24h vive in RAM e si perde al riavvio.
 
@@ -95,11 +96,8 @@ Stesso linguaggio visivo della dashboard. Sezioni:
 3. **Tuning VOC** — i 6 parametri con range e default del datasheet
    (indexOffset 1–250 def 100, learningTimeOffset/Gain 1–1000 h def 12,
    gatingMaxDuration 0–3000 min def 180, stdInitial 10–5000 def 50,
-   gainFactor 1–1000 def 230). In fondo alla sezione: toggle **"Persistenza
-   apprendimento VOC"** (default on) e pulsante **"Reset apprendimento VOC"**
-   (con conferma) che cancella il blob salvato, esegue `deviceReset`,
-   riapplica tutti i settaggi persistiti e riavvia la misura — si perde solo
-   il learning VOC/NOx, non la configurazione.
+   gainFactor 1–1000 def 230). Nessun controllo di persistenza/reset VOC
+   (rimosso: vedi esclusioni).
 4. **Tuning NOx** — solo i parametri efficaci (indexOffset def 1,
    learningTimeOffsetHours def 12, gatingMaxDuration def 720, gainFactor
    def 230); `learningTimeGainHours=12` e `stdInitial=50` fissati dal
@@ -133,14 +131,10 @@ li salva e li riapplica a ogni avvio nell'ordine: altitudine (o pressione),
 offset temperatura, tuning VOC, tuning NOx, restore stato VOC, ASC,
 start misura. Chiavi esistenti `lastFan`/`lastHeat` conservate.
 
-### Stato VOC automatico
-- Salvataggio: ogni 60 min in misura (`getVocAlgorithmState`, blob 8 byte)
-  in Preferences — solo se la persistenza è attiva (toggle in `/admin`,
-  default on; disattivandola il blob salvato viene cancellato).
-- Ripristino: a ogni avvio, prima di `startContinuousMeasurement`, se la
-  persistenza è attiva e il blob esiste.
-- "Reset apprendimento VOC" (in `/admin`) e "reset learning" completo
-  cancellano entrambi questo blob.
+### Stato VOC
+Nessuna persistenza (rimossa): VOC e NOx ripartono da zero a ogni riavvio.
+`loadSettings()` ripulisce le chiavi NVS residue della feature ritirata
+(`vocState`, `vocPersist`).
 
 ### Applicazione settaggi (comandi idle-only)
 POST `/api/settings` → il firmware: `stopMeasurement()` → applica i comandi

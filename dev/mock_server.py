@@ -14,7 +14,7 @@ def data():
 
 def settings():
     return {"altitude": 0, "usePressure": False, "pressure": 1013, "tempOffset": 0.0, "tempSlope": 0.0,
-            "vocPersist": True, "asc": True, "frcTarget": 420,
+            "asc": True, "frcTarget": 420,
             "vocIdxOff": 100, "vocLearnOff": 12, "vocLearnGain": 12, "vocGateMax": 180, "vocStdInit": 50, "vocGain": 230,
             "noxIdxOff": 1, "noxLearnOff": 12, "noxGateMax": 720, "noxGain": 230}
 
