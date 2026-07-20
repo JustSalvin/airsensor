@@ -196,27 +196,33 @@ static void saveSettings() {
 }
 
 // Idle-only commands. Call between stopMeasurement() and startContinuousMeasurement().
-static void applyIdleSettings() {
-    check(sensor.setSensorAltitude(cfg.altitude), "setSensorAltitude()");
-    check(sensor.setVocAlgorithmTuningParameters(cfg.vocIdxOff, cfg.vocLearnOff,
+// Returns true only if every check() below succeeded (all are attempted regardless).
+static bool applyIdleSettings() {
+    bool ok = true;
+    ok &= check(sensor.setSensorAltitude(cfg.altitude), "setSensorAltitude()");
+    ok &= check(sensor.setVocAlgorithmTuningParameters(cfg.vocIdxOff, cfg.vocLearnOff,
           cfg.vocLearnGain, cfg.vocGateMax, cfg.vocStdInit, cfg.vocGain),
           "setVocAlgorithmTuningParameters()");
     // NOx: learningTimeGainHours must be 12, stdInitial must be 50 (datasheet)
-    check(sensor.setNoxAlgorithmTuningParameters(cfg.noxIdxOff, cfg.noxLearnOff,
+    ok &= check(sensor.setNoxAlgorithmTuningParameters(cfg.noxIdxOff, cfg.noxLearnOff,
           12, cfg.noxGateMax, 50, cfg.noxGain),
           "setNoxAlgorithmTuningParameters()");
-    check(sensor.setCo2SensorAutomaticSelfCalibration(cfg.asc ? 1 : 0),
+    ok &= check(sensor.setCo2SensorAutomaticSelfCalibration(cfg.asc ? 1 : 0),
           "setCo2SensorAutomaticSelfCalibration()");
+    return ok;
 }
 
 // Commands accepted in any state.
-static void applyAnyStateSettings() {
+// Returns true only if every check() below succeeded (all are attempted regardless).
+static bool applyAnyStateSettings() {
+    bool ok = true;
     if (cfg.usePressure)
-        check(sensor.setAmbientPressure(cfg.pressure), "setAmbientPressure()");
-    check(sensor.setTemperatureOffsetParameters(
+        ok &= check(sensor.setAmbientPressure(cfg.pressure), "setAmbientPressure()");
+    ok &= check(sensor.setTemperatureOffsetParameters(
           (int16_t)lroundf(cfg.tempOffset * 200.0f),
           (int16_t)lroundf(cfg.tempSlope * 10000.0f), 0, 0),
           "setTemperatureOffsetParameters()");
+    return ok;
 }
 
 // ------------------------------------------------------------
@@ -233,9 +239,10 @@ static bool startSensor() {
     sensor.stopMeasurement();          // harmless error if already idle
     delay(1500);
 
-    // Volatile settings -> reapplied every boot:
-    applyIdleSettings();
-    applyAnyStateSettings();
+    // Volatile settings -> reapplied every boot. Boot continues regardless of
+    // whether the sensor accepts them, so results are intentionally ignored here.
+    (void)applyIdleSettings();
+    (void)applyAnyStateSettings();
 
     if (!check(sensor.startContinuousMeasurement(), "startContinuousMeasurement()"))
         return false;
@@ -440,14 +447,16 @@ static void handleApiSettingsPost() {
     cfg = c;
     saveSettings();
     if (persistTurnedOff) prefs.remove("vocState");   // key defined in Task 4
+    bool applied;
     if (needIdle) {
         pauseMeasurement();
-        applyIdleSettings();
-        applyAnyStateSettings();
+        applied = applyIdleSettings();
+        applied &= applyAnyStateSettings();
         resumeMeasurement();          // PM warmup restarts, state machine follows
     } else {
-        applyAnyStateSettings();
+        applied = applyAnyStateSettings();
     }
+    if (!applied) { sendErr(500, "sensor rejected settings"); return; }
     server.send(200, "application/json", "{\"ok\":true}");
 }
 
