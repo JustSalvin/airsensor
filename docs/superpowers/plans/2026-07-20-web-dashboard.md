@@ -335,7 +335,7 @@ In `startSensor()`, sostituisci la riga `setSensorAltitude(SENSOR_ALTITUDE_M)` c
 
 - [ ] **Step 3: Endpoint GET/POST**
 
-GET serializza tutti i campi con le stesse chiavi accettate dal POST: `altitude, usePressure, pressure, tempOffset, tempSlope, vocPersist, asc, frcTarget, vocIdxOff, vocLearnOff, vocLearnGain, vocGateMax, vocStdInit, vocGain, noxIdxOff, noxLearnOff, noxGateMax, noxGain` (bool come `0/1`). Parsing POST completo:
+GET serializza tutti i campi con le stesse chiavi accettate dal POST: `altitude, usePressure, pressure, tempOffset, tempSlope, vocPersist, asc, frcTarget, vocIdxOff, vocLearnOff, vocLearnGain, vocGateMax, vocStdInit, vocGain, noxIdxOff, noxLearnOff, noxGateMax, noxGain`. Nel GET i bool sono JSON `true/false`; nel POST (form-urlencoded) i bool si inviano come `0/1`. Le funzioni `applyIdleSettings`/`applyAnyStateSettings` restituiscono `bool` (AND dei `check()`); se l'applicazione fallisce il POST risponde 500 `{"ok":false,"error":"sensor rejected settings"}` come richiesto dalla spec (sezione Gestione errori). Parsing POST completo:
 
 ```cpp
 // Parse helpers: absent arg = keep current value; out-of-range = reject.
