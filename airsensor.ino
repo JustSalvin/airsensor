@@ -21,9 +21,6 @@
 char ssid[] = "NETGEAR30";
 char pass[] = "TyjH39hFzd";
 
-static constexpr uint16_t SENSOR_ALTITUDE_M = 120;    // your site; never reset
-static constexpr uint16_t FRESH_AIR_CO2_PPM = 420;    // reference for forced recalibration
-
 static constexpr int PIN_SDA = 22;   // green wire
 static constexpr int PIN_SCL = 23;   // yellow wire
 
@@ -67,6 +64,24 @@ static void histTick() {
     for (int m = 0; m < METRIC_COUNT; m++) { histSum[m][histHead] = 0; histCnt[m][histHead] = 0; }
 }
 
+// Persisted sensor tuning settings (Preferences-backed). Declared here, ahead
+// of every function, for the same auto-prototype-safety reason as the
+// history ring buffer above.
+struct Settings {
+    uint16_t altitude    = 120;      // m, 0-3000 (previous fixed SENSOR_ALTITUDE_M default)
+    bool     usePressure = false;    // true: ambient pressure overrides altitude
+    uint16_t pressure    = 1013;     // hPa, 700-1200
+    float    tempOffset  = 0.0f;     // degC, firmware scales x200
+    float    tempSlope   = 0.0f;     // normalized, firmware scales x10000
+    bool     vocPersist  = true;     // auto save/restore VOC learning state
+    bool     asc         = true;     // CO2 automatic self calibration
+    uint16_t frcTarget   = 420;      // ppm used by the FRC command
+    int16_t  vocIdxOff = 100, vocLearnOff = 12, vocLearnGain = 12,
+             vocGateMax = 180, vocStdInit = 50, vocGain = 230;
+    int16_t  noxIdxOff = 1, noxLearnOff = 12, noxGateMax = 720, noxGain = 230;
+};
+static Settings cfg;
+
 SensirionI2cSen66 sensor;
 WebServer server(80);
 
@@ -80,7 +95,7 @@ struct Latest {
 static Latest latest;
 static uint32_t deviceStatusRaw = 0;  // refreshed each sendData()
 
-Preferences prefs;                     // stores ONLY the two maintenance dates
+Preferences prefs;                     // maintenance dates + persisted Settings
 
 static char errorMessage[128];
 static SensorState state     = SensorState::BOOT;
@@ -145,6 +160,66 @@ static bool scanBus() {
 }
 
 // ------------------------------------------------------------
+//  Settings persistence and application
+// ------------------------------------------------------------
+static void loadSettings() {
+    cfg.altitude    = prefs.getUShort("alt",      cfg.altitude);
+    cfg.usePressure = prefs.getBool  ("usePress", cfg.usePressure);
+    cfg.pressure    = prefs.getUShort("press",    cfg.pressure);
+    cfg.tempOffset  = prefs.getFloat ("tOff",     cfg.tempOffset);
+    cfg.tempSlope   = prefs.getFloat ("tSlope",   cfg.tempSlope);
+    cfg.vocPersist  = prefs.getBool  ("vocPersist", cfg.vocPersist);
+    cfg.asc         = prefs.getBool  ("asc",      cfg.asc);
+    cfg.frcTarget   = prefs.getUShort("frcTarget", cfg.frcTarget);
+    cfg.vocIdxOff   = prefs.getShort ("vocIdxOff",  cfg.vocIdxOff);
+    cfg.vocLearnOff = prefs.getShort ("vocLearnOff", cfg.vocLearnOff);
+    cfg.vocLearnGain= prefs.getShort ("vocLearnGain", cfg.vocLearnGain);
+    cfg.vocGateMax  = prefs.getShort ("vocGateMax", cfg.vocGateMax);
+    cfg.vocStdInit  = prefs.getShort ("vocStdInit", cfg.vocStdInit);
+    cfg.vocGain     = prefs.getShort ("vocGain",   cfg.vocGain);
+    cfg.noxIdxOff   = prefs.getShort ("noxIdxOff", cfg.noxIdxOff);
+    cfg.noxLearnOff = prefs.getShort ("noxLearnOff", cfg.noxLearnOff);
+    cfg.noxGateMax  = prefs.getShort ("noxGateMax", cfg.noxGateMax);
+    cfg.noxGain     = prefs.getShort ("noxGain",   cfg.noxGain);
+}
+static void saveSettings() {
+    prefs.putUShort("alt", cfg.altitude);      prefs.putBool("usePress", cfg.usePressure);
+    prefs.putUShort("press", cfg.pressure);
+    prefs.putFloat("tOff", cfg.tempOffset);    prefs.putFloat("tSlope", cfg.tempSlope);
+    prefs.putBool("vocPersist", cfg.vocPersist); prefs.putBool("asc", cfg.asc);
+    prefs.putUShort("frcTarget", cfg.frcTarget);
+    prefs.putShort("vocIdxOff", cfg.vocIdxOff);  prefs.putShort("vocLearnOff", cfg.vocLearnOff);
+    prefs.putShort("vocLearnGain", cfg.vocLearnGain); prefs.putShort("vocGateMax", cfg.vocGateMax);
+    prefs.putShort("vocStdInit", cfg.vocStdInit); prefs.putShort("vocGain", cfg.vocGain);
+    prefs.putShort("noxIdxOff", cfg.noxIdxOff);  prefs.putShort("noxLearnOff", cfg.noxLearnOff);
+    prefs.putShort("noxGateMax", cfg.noxGateMax); prefs.putShort("noxGain", cfg.noxGain);
+}
+
+// Idle-only commands. Call between stopMeasurement() and startContinuousMeasurement().
+static void applyIdleSettings() {
+    check(sensor.setSensorAltitude(cfg.altitude), "setSensorAltitude()");
+    check(sensor.setVocAlgorithmTuningParameters(cfg.vocIdxOff, cfg.vocLearnOff,
+          cfg.vocLearnGain, cfg.vocGateMax, cfg.vocStdInit, cfg.vocGain),
+          "setVocAlgorithmTuningParameters()");
+    // NOx: learningTimeGainHours must be 12, stdInitial must be 50 (datasheet)
+    check(sensor.setNoxAlgorithmTuningParameters(cfg.noxIdxOff, cfg.noxLearnOff,
+          12, cfg.noxGateMax, 50, cfg.noxGain),
+          "setNoxAlgorithmTuningParameters()");
+    check(sensor.setCo2SensorAutomaticSelfCalibration(cfg.asc ? 1 : 0),
+          "setCo2SensorAutomaticSelfCalibration()");
+}
+
+// Commands accepted in any state.
+static void applyAnyStateSettings() {
+    if (cfg.usePressure)
+        check(sensor.setAmbientPressure(cfg.pressure), "setAmbientPressure()");
+    check(sensor.setTemperatureOffsetParameters(
+          (int16_t)lroundf(cfg.tempOffset * 200.0f),
+          (int16_t)lroundf(cfg.tempSlope * 10000.0f), 0, 0),
+          "setTemperatureOffsetParameters()");
+}
+
+// ------------------------------------------------------------
 //  Sensor lifecycle
 // ------------------------------------------------------------
 static bool startSensor() {
@@ -159,9 +234,8 @@ static bool startSensor() {
     delay(1500);
 
     // Volatile settings -> reapplied every boot:
-    check(sensor.setSensorAltitude(SENSOR_ALTITUDE_M), "setSensorAltitude()");
-    // CO2 self-calibration: on by default, corrections stored inside
-    // the sensor's own persistent memory. Nothing to do.
+    applyIdleSettings();
+    applyAnyStateSettings();
 
     if (!check(sensor.startContinuousMeasurement(), "startContinuousMeasurement()"))
         return false;
@@ -278,6 +352,105 @@ static void handleApiHistory() {
     server.send(200, "application/json", s);
 }
 
+static void sendErr(int code, const char* msg) {
+    String s = "{\"ok\":false,\"error\":\""; s += msg; s += "\"}";
+    server.send(code, "application/json", s);
+}
+
+static void handleApiSettingsGet() {
+    String s; s.reserve(400);
+    s += "{\"altitude\":"; s += String(cfg.altitude); s += ',';
+    s += "\"usePressure\":"; s += (cfg.usePressure ? "true" : "false"); s += ',';
+    s += "\"pressure\":"; s += String(cfg.pressure); s += ',';
+    s += "\"tempOffset\":"; s += String(cfg.tempOffset, 3); s += ',';
+    s += "\"tempSlope\":"; s += String(cfg.tempSlope, 3); s += ',';
+    s += "\"vocPersist\":"; s += (cfg.vocPersist ? "true" : "false"); s += ',';
+    s += "\"asc\":"; s += (cfg.asc ? "true" : "false"); s += ',';
+    s += "\"frcTarget\":"; s += String(cfg.frcTarget); s += ',';
+    s += "\"vocIdxOff\":"; s += String(cfg.vocIdxOff); s += ',';
+    s += "\"vocLearnOff\":"; s += String(cfg.vocLearnOff); s += ',';
+    s += "\"vocLearnGain\":"; s += String(cfg.vocLearnGain); s += ',';
+    s += "\"vocGateMax\":"; s += String(cfg.vocGateMax); s += ',';
+    s += "\"vocStdInit\":"; s += String(cfg.vocStdInit); s += ',';
+    s += "\"vocGain\":"; s += String(cfg.vocGain); s += ',';
+    s += "\"noxIdxOff\":"; s += String(cfg.noxIdxOff); s += ',';
+    s += "\"noxLearnOff\":"; s += String(cfg.noxLearnOff); s += ',';
+    s += "\"noxGateMax\":"; s += String(cfg.noxGateMax); s += ',';
+    s += "\"noxGain\":"; s += String(cfg.noxGain);
+    s += '}';
+    server.send(200, "application/json", s);
+}
+
+// Parse helpers: absent arg = keep current value; out-of-range = reject.
+static bool argU16(const char* n, uint16_t& out, long lo, long hi, String& bad) {
+    if (!server.hasArg(n)) return true;
+    long v = server.arg(n).toInt();
+    if (v < lo || v > hi) { bad = n; return false; }
+    out = (uint16_t)v; return true;
+}
+static bool argI16(const char* n, int16_t& out, long lo, long hi, String& bad) {
+    if (!server.hasArg(n)) return true;
+    long v = server.arg(n).toInt();
+    if (v < lo || v > hi) { bad = n; return false; }
+    out = (int16_t)v; return true;
+}
+static bool argF(const char* n, float& out, float lo, float hi, String& bad) {
+    if (!server.hasArg(n)) return true;
+    float v = server.arg(n).toFloat();
+    if (isnan(v) || v < lo || v > hi) { bad = n; return false; }
+    out = v; return true;
+}
+static bool argB(const char* n, bool& out) {
+    if (server.hasArg(n)) out = server.arg(n).toInt() != 0;
+    return true;
+}
+
+static void handleApiSettingsPost() {
+    Settings c = cfg;                      // work on a copy, commit only if all valid
+    String bad;
+    bool ok = argU16("altitude", c.altitude, 0, 3000, bad)
+           && argU16("pressure", c.pressure, 700, 1200, bad)
+           && argU16("frcTarget", c.frcTarget, 0, 2000, bad)
+           && argF("tempOffset", c.tempOffset, -10, 10, bad)
+           && argF("tempSlope",  c.tempSlope, -1, 1, bad)
+           && argI16("vocIdxOff",   c.vocIdxOff, 1, 250, bad)
+           && argI16("vocLearnOff", c.vocLearnOff, 1, 1000, bad)
+           && argI16("vocLearnGain",c.vocLearnGain, 1, 1000, bad)
+           && argI16("vocGateMax",  c.vocGateMax, 0, 3000, bad)
+           && argI16("vocStdInit",  c.vocStdInit, 10, 5000, bad)
+           && argI16("vocGain",     c.vocGain, 1, 1000, bad)
+           && argI16("noxIdxOff",   c.noxIdxOff, 1, 250, bad)
+           && argI16("noxLearnOff", c.noxLearnOff, 1, 1000, bad)
+           && argI16("noxGateMax",  c.noxGateMax, 0, 3000, bad)
+           && argI16("noxGain",     c.noxGain, 1, 1000, bad);
+    argB("usePressure", c.usePressure);
+    argB("vocPersist",  c.vocPersist);
+    argB("asc",         c.asc);
+    if (!ok) { sendErr(400, ("invalid " + bad).c_str()); return; }
+
+    // Idle-only commands needed only if one of these actually changed.
+    bool needIdle = c.altitude != cfg.altitude || c.asc != cfg.asc
+        || c.vocIdxOff != cfg.vocIdxOff || c.vocLearnOff != cfg.vocLearnOff
+        || c.vocLearnGain != cfg.vocLearnGain || c.vocGateMax != cfg.vocGateMax
+        || c.vocStdInit != cfg.vocStdInit || c.vocGain != cfg.vocGain
+        || c.noxIdxOff != cfg.noxIdxOff || c.noxLearnOff != cfg.noxLearnOff
+        || c.noxGateMax != cfg.noxGateMax || c.noxGain != cfg.noxGain;
+    bool persistTurnedOff = cfg.vocPersist && !c.vocPersist;
+
+    cfg = c;
+    saveSettings();
+    if (persistTurnedOff) prefs.remove("vocState");   // key defined in Task 4
+    if (needIdle) {
+        pauseMeasurement();
+        applyIdleSettings();
+        applyAnyStateSettings();
+        resumeMeasurement();          // PM warmup restarts, state machine follows
+    } else {
+        applyAnyStateSettings();
+    }
+    server.send(200, "application/json", "{\"ok\":true}");
+}
+
 void sendData() {
     if (state == SensorState::BOOT || state == SensorState::FAULT) {
         publishState(SensorState::FAULT);
@@ -338,6 +511,7 @@ void setup() {
     Serial.println();
 
     prefs.begin("airsensor", false);
+    loadSettings();
     Wire.begin(PIN_SDA, PIN_SCL, I2C_FREQ);
 
     WiFi.mode(WIFI_STA);
@@ -349,6 +523,8 @@ void setup() {
 
     server.on("/api/data", HTTP_GET, handleApiData);
     server.on("/api/history", HTTP_GET, handleApiHistory);
+    server.on("/api/settings", HTTP_GET, handleApiSettingsGet);
+    server.on("/api/settings", HTTP_POST, handleApiSettingsPost);
     server.begin();
 
     configTime(0, 0, "pool.ntp.org");
