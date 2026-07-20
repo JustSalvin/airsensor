@@ -476,6 +476,100 @@ static void handleApiSettingsPost() {
     server.send(200, "application/json", "{\"ok\":true}");
 }
 
+static void sendOk() { server.send(200, "application/json", "{\"ok\":true}"); }
+
+// Full restart used by the reset commands: reset chip, reapply, remeasure.
+static void restartAfterDeviceReset() {
+    check(sensor.deviceReset(), "deviceReset()");
+    delay(1500);
+    publishState(SensorState::BOOT);
+    if (startSensor()) publishState(SensorState::WARMUP);
+}
+
+static void handleApiCmd() {
+    String cmd = server.arg("cmd");
+    if (cmd == "fan") {
+        publishStatusText("Cleaning fan...");
+        pauseMeasurement(); doFanCleaning(); resumeMeasurement();
+        sendOk();
+    } else if (cmd == "heater") {
+        publishStatusText("SHT heater cycle...");
+        pauseMeasurement(); doShtHeater(); resumeMeasurement();
+        sendOk();
+    } else if (cmd == "frc") {
+        if (millis() - measStartMs < MIN_RUN_BEFORE_FRC) { sendErr(409, "run >= 3 min first"); return; }
+        publishStatusText("CO2 recalibration...");
+        pauseMeasurement();
+        uint16_t corr = 0;
+        bool ok = check(sensor.performForcedCo2Recalibration(cfg.frcTarget, corr),
+                        "performForcedCo2Recalibration()") && corr != 0xFFFF;
+        delay(500);
+        resumeMeasurement();
+        if (!ok) { sendErr(500, "FRC failed"); return; }
+        String s = "{\"ok\":true,\"correction\":"; s += String((int)corr - 0x8000); s += '}';
+        server.send(200, "application/json", s);
+    } else if (cmd == "voc_reset") {
+        // Lose only VOC/NOx learning; keep every persisted setting.
+        publishStatusText("Resetting VOC learning...");
+        prefs.remove("vocState");
+        pauseMeasurement();
+        restartAfterDeviceReset();
+        sendOk();
+    } else if (cmd == "reset_learning") {
+        // Tuning back to defaults + learning wiped; maintenance dates kept.
+        publishStatusText("Resetting learning...");
+        Settings fresh;
+        cfg = fresh;
+        saveSettings();
+        prefs.remove("vocState");
+        pauseMeasurement();
+        restartAfterDeviceReset();
+        sendOk();
+    } else if (cmd == "co2_factory_reset") {
+        publishStatusText("CO2 factory reset...");
+        pauseMeasurement();
+        bool ok = check(sensor.performCo2SensorFactoryReset(), "performCo2SensorFactoryReset()");
+        resumeMeasurement();
+        ok ? sendOk() : sendErr(500, "co2 factory reset failed");
+    } else if (cmd == "clear_status") {
+        SEN66DeviceStatus ds;
+        bool ok = check(sensor.readAndClearDeviceStatus(ds), "readAndClearDeviceStatus()");
+        if (ok) deviceStatusRaw = 0;
+        ok ? sendOk() : sendErr(500, "clear failed");
+    } else {
+        sendErr(400, "unknown cmd");
+    }
+}
+
+static void handleApiDevice() {
+    int8_t name[32] = {0}, serial[32] = {0};
+    uint8_t fwMaj = 0, fwMin = 0;
+    sensor.getProductName(name, sizeof name);
+    sensor.getSerialNumber(serial, sizeof serial);
+    sensor.getVersion(fwMaj, fwMin);
+    SEN66DeviceStatus ds; ds.value = deviceStatusRaw;
+    String s; s.reserve(420);
+    s += "{\"product\":\""; s += (const char*)name;
+    s += "\",\"serial\":\""; s += (const char*)serial;
+    s += "\",\"fw\":\""; s += String(fwMaj); s += '.'; s += String(fwMin); s += "\",";
+    s += "\"flags\":{";
+    s += "\"fan\":";   s += ds.fanError ? "true," : "false,";
+    s += "\"rht\":";   s += ds.rhtError ? "true," : "false,";
+    s += "\"gas\":";   s += ds.gasError ? "true," : "false,";
+    s += "\"co2a\":";  s += ds.co21Error ? "true," : "false,";
+    s += "\"co2b\":";  s += ds.co22Error ? "true," : "false,";
+    s += "\"pm\":";    s += ds.pmError ? "true," : "false,";
+    s += "\"speed\":"; s += ds.fanSpeedWarning ? "true" : "false";
+    s += "},";
+    s += "\"rssi\":"; s += String(WiFi.RSSI()); s += ',';
+    s += "\"ip\":\""; s += WiFi.localIP().toString(); s += "\",";
+    s += "\"heap\":"; s += String(ESP.getFreeHeap()); s += ',';
+    s += "\"uptimeS\":"; s += String(millis() / 1000); s += ',';
+    s += "\"lastFan\":"; s += String((long long)prefs.getLong64("lastFan", 0)); s += ',';
+    s += "\"lastHeat\":"; s += String((long long)prefs.getLong64("lastHeat", 0)); s += '}';
+    server.send(200, "application/json", s);
+}
+
 void sendData() {
     if (state == SensorState::BOOT || state == SensorState::FAULT) {
         publishState(SensorState::FAULT);
@@ -550,6 +644,8 @@ void setup() {
     server.on("/api/history", HTTP_GET, handleApiHistory);
     server.on("/api/settings", HTTP_GET, handleApiSettingsGet);
     server.on("/api/settings", HTTP_POST, handleApiSettingsPost);
+    server.on("/api/cmd", HTTP_POST, handleApiCmd);
+    server.on("/api/device", HTTP_GET, handleApiDevice);
     server.begin();
 
     configTime(0, 0, "pool.ntp.org");
