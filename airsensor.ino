@@ -43,6 +43,30 @@ static constexpr time_t   TIME_VALID_AFTER   = 1700000000;
 
 enum class SensorState { BOOT, WARMUP, GAS_CALIBRATION, READY, FAULT };
 
+// 24h history ring buffer (30 min buckets, 48 points). Declared here, ahead
+// of every function, so the IDE's auto-generated prototypes (which land
+// above the first function definition) see the Metric type already defined.
+enum Metric { M_CO2, M_PM1, M_PM25, M_PM4, M_PM10, M_VOC, M_NOX, M_TEMP, M_HUM, METRIC_COUNT };
+static constexpr int      HIST_POINTS = 48;
+static constexpr uint32_t BUCKET_MS   = 30UL * 60 * 1000;
+
+static float    histSum[METRIC_COUNT][HIST_POINTS] = {};
+static uint16_t histCnt[METRIC_COUNT][HIST_POINTS] = {};
+static int      histHead = 0;
+static uint32_t bucketStartMs = 0;
+
+static void histAdd(Metric m, float v) {
+    histSum[m][histHead] += v;
+    histCnt[m][histHead]++;
+}
+
+static void histTick() {
+    if (millis() - bucketStartMs < BUCKET_MS) return;
+    bucketStartMs += BUCKET_MS;
+    histHead = (histHead + 1) % HIST_POINTS;
+    for (int m = 0; m < METRIC_COUNT; m++) { histSum[m][histHead] = 0; histCnt[m][histHead] = 0; }
+}
+
 SensirionI2cSen66 sensor;
 WebServer server(80);
 
@@ -233,6 +257,27 @@ static void handleApiData() {
     s += "\"faultFlags\":"; s += String(deviceStatusRaw); s += '}';
     server.send(200, "application/json", s);
 }
+
+static const char* const METRIC_KEYS[METRIC_COUNT] =
+    { "co2", "pm1", "pm25", "pm4", "pm10", "voc", "nox", "temp", "hum" };
+
+static void handleApiHistory() {
+    String s; s.reserve(4500);
+    s += "{\"interval\":1800,\"points\":48,\"series\":{";
+    for (int m = 0; m < METRIC_COUNT; m++) {
+        s += '"'; s += METRIC_KEYS[m]; s += "\":[";
+        for (int i = 1; i <= HIST_POINTS; i++) {          // oldest -> newest
+            int idx = (histHead + i) % HIST_POINTS;
+            if (histCnt[m][idx] == 0) s += "null";
+            else s += String(histSum[m][idx] / histCnt[m][idx], m == M_CO2 ? 0 : 1);
+            if (i < HIST_POINTS) s += ',';
+        }
+        s += ']'; if (m < METRIC_COUNT - 1) s += ',';
+    }
+    s += "}}";
+    server.send(200, "application/json", s);
+}
+
 void sendData() {
     if (state == SensorState::BOOT || state == SensorState::FAULT) {
         publishState(SensorState::FAULT);
@@ -256,20 +301,20 @@ void sendData() {
 
     uint32_t age = millis() - measStartMs;
 
-    if (plausible(temperature, -50, 100)) latest.temp = temperature;
-    if (plausible(humidity, 0, 100))      latest.hum  = humidity;
+    if (plausible(temperature, -50, 100)) { latest.temp = temperature; histAdd(M_TEMP, temperature); }
+    if (plausible(humidity, 0, 100))      { latest.hum  = humidity;   histAdd(M_HUM, humidity); }
 
     if (age >= WARMUP_PM_MS) {         // PM muted during its 30 s warmup
-        if (plausible(pm1,   0, 1000)) latest.pm1  = pm1;
-        if (plausible(pm2p5, 0, 1000)) latest.pm25 = pm2p5;
-        if (plausible(pm4,   0, 1000)) latest.pm4  = pm4;
-        if (plausible(pm10,  0, 1000)) latest.pm10 = pm10;
+        if (plausible(pm1,   0, 1000)) { latest.pm1  = pm1;   histAdd(M_PM1,  pm1); }
+        if (plausible(pm2p5, 0, 1000)) { latest.pm25 = pm2p5; histAdd(M_PM25, pm2p5); }
+        if (plausible(pm4,   0, 1000)) { latest.pm4  = pm4;   histAdd(M_PM4,  pm4); }
+        if (plausible(pm10,  0, 1000)) { latest.pm10 = pm10;  histAdd(M_PM10, pm10); }
     }
 
-    if (co2 != 0xFFFF && co2 <= 40000) latest.co2 = co2;
+    if (co2 != 0xFFFF && co2 <= 40000) { latest.co2 = co2; histAdd(M_CO2, co2); }
 
-    if (plausible(voc, 1, 500)) latest.voc = voc;
-    if (plausible(nox, 1, 500)) latest.nox = nox;
+    if (plausible(voc, 1, 500)) { latest.voc = voc; histAdd(M_VOC, voc); }
+    if (plausible(nox, 1, 500)) { latest.nox = nox; histAdd(M_NOX, nox); }
 
     latest.updatedAt = millis();
 
@@ -303,16 +348,19 @@ void setup() {
     if (MDNS.begin("airsensor")) MDNS.addService("http", "tcp", 80);
 
     server.on("/api/data", HTTP_GET, handleApiData);
+    server.on("/api/history", HTTP_GET, handleApiHistory);
     server.begin();
 
     configTime(0, 0, "pool.ntp.org");
 
+    bucketStartMs = millis();
     publishState(SensorState::BOOT);
     if (startSensor()) publishState(SensorState::WARMUP);
 }
 
 void loop() {
     server.handleClient();
+    histTick();
     static uint32_t tSend = 0, tMaint = 0;
     uint32_t now = millis();
     if (now - tSend  >= SEND_INTERVAL_MS) { tSend  = now; sendData(); }
