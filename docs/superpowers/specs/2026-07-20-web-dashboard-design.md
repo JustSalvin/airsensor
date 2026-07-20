@@ -17,8 +17,9 @@ calibrazione e manutenzione del SEN66, nello stesso stile visivo.
   servizi esterni scartati per scelta). La logica `checkAlert`/isteresi e le
   soglie di allerta vengono rimosse: i colori delle bande nella UI sono fissi,
   come nel design.
-- **Nessun controllo dello stato VOC in `/admin`**: il backup/ripristino del
-  learning VOC è completamente automatico e invisibile.
+- Il backup/ripristino del learning VOC è **automatico** (nessuna azione
+  manuale di salvataggio/ripristino); in `/admin` sono esposti solo un toggle
+  on/off della persistenza e un reset dell'apprendimento.
 - Nessun HTTPS, nessuna autenticazione (rete domestica fidata).
 - Nessuno storico persistente: il buffer 24h vive in RAM e si perde al riavvio.
 
@@ -89,7 +90,11 @@ Stesso linguaggio visivo della dashboard. Sezioni:
 3. **Tuning VOC** — i 6 parametri con range e default del datasheet
    (indexOffset 1–250 def 100, learningTimeOffset/Gain 1–1000 h def 12,
    gatingMaxDuration 0–3000 min def 180, stdInitial 10–5000 def 50,
-   gainFactor 1–1000 def 230).
+   gainFactor 1–1000 def 230). In fondo alla sezione: toggle **"Persistenza
+   apprendimento VOC"** (default on) e pulsante **"Reset apprendimento VOC"**
+   (con conferma) che cancella il blob salvato, esegue `deviceReset`,
+   riapplica tutti i settaggi persistiti e riavvia la misura — si perde solo
+   il learning VOC/NOx, non la configurazione.
 4. **Tuning NOx** — solo i parametri efficaci (indexOffset def 1,
    learningTimeOffsetHours def 12, gatingMaxDuration def 720, gainFactor
    def 230); `learningTimeGainHours=12` e `stdInitial=50` fissati dal
@@ -126,10 +131,12 @@ start misura. Chiavi esistenti `lastFan`/`lastHeat` conservate.
 
 ### Stato VOC automatico
 - Salvataggio: ogni 60 min in misura (`getVocAlgorithmState`, blob 8 byte)
-  in Preferences.
-- Ripristino: a ogni avvio, prima di `startContinuousMeasurement`, se il blob
-  esiste.
-- Il "reset learning" cancella anche questo blob.
+  in Preferences — solo se la persistenza è attiva (toggle in `/admin`,
+  default on; disattivandola il blob salvato viene cancellato).
+- Ripristino: a ogni avvio, prima di `startContinuousMeasurement`, se la
+  persistenza è attiva e il blob esiste.
+- "Reset apprendimento VOC" (in `/admin`) e "reset learning" completo
+  cancellano entrambi questo blob.
 
 ### Applicazione settaggi (comandi idle-only)
 POST `/api/settings` → il firmware: `stopMeasurement()` → applica i comandi
