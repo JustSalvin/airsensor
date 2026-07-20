@@ -36,6 +36,7 @@ static constexpr uint32_t WARMUP_NOX_MS      = 6UL * 60 * 60 * 1000;
 static constexpr uint32_t MIN_RUN_BEFORE_FRC = 3UL * 60 * 1000;
 static constexpr time_t   FAN_CLEAN_PERIOD_S = 7UL  * 24 * 3600;   // weekly
 static constexpr time_t   SHT_HEAT_PERIOD_S  = 30UL * 24 * 3600;   // monthly
+static constexpr uint32_t VOC_SAVE_MS        = 60UL * 60 * 1000;   // hourly
 static constexpr time_t   TIME_VALID_AFTER   = 1700000000;
 
 enum class SensorState { BOOT, WARMUP, GAS_CALIBRATION, READY, FAULT };
@@ -225,6 +226,14 @@ static bool applyAnyStateSettings() {
     return ok;
 }
 
+static void saveVocState() {
+    if (!cfg.vocPersist) return;
+    if (state != SensorState::READY && state != SensorState::GAS_CALIBRATION) return;
+    uint8_t st[8];
+    if (check(sensor.getVocAlgorithmState(st, sizeof st), "getVocAlgorithmState()"))
+        prefs.putBytes("vocState", st, sizeof st);
+}
+
 // ------------------------------------------------------------
 //  Sensor lifecycle
 // ------------------------------------------------------------
@@ -243,6 +252,13 @@ static bool startSensor() {
     // whether the sensor accepts them, so results are intentionally ignored here.
     (void)applyIdleSettings();
     (void)applyAnyStateSettings();
+
+    if (cfg.vocPersist && prefs.getBytesLength("vocState") == 8) {
+        uint8_t st[8];
+        prefs.getBytes("vocState", st, sizeof st);
+        if (check(sensor.setVocAlgorithmState(st, sizeof st), "setVocAlgorithmState()"))
+            Serial.println("VOC learning state restored.");
+    }
 
     if (!check(sensor.startContinuousMeasurement(), "startContinuousMeasurement()"))
         return false;
@@ -546,8 +562,9 @@ void setup() {
 void loop() {
     server.handleClient();
     histTick();
-    static uint32_t tSend = 0, tMaint = 0;
+    static uint32_t tSend = 0, tMaint = 0, tVoc = 0;
     uint32_t now = millis();
     if (now - tSend  >= SEND_INTERVAL_MS) { tSend  = now; sendData(); }
     if (now - tMaint >= MAINT_CHECK_MS)   { tMaint = now; runMaintenanceIfDue(); }
+    if (now - tVoc   >= VOC_SAVE_MS)      { tVoc   = now; saveVocState(); }
 }
