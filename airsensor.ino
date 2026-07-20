@@ -11,6 +11,7 @@
 #include <SensirionI2cSen66.h>
 #include "dashboard_html.h"
 #include "admin_html.h"
+#include "icon_png.h"
 
 static const char MANIFEST_JSON[] PROGMEM = R"JSON({
   "name": "Air Sensor", "short_name": "Air",
@@ -674,6 +675,7 @@ void setup() {
     server.on("/api/device", HTTP_GET, handleApiDevice);
     server.on("/manifest.json", HTTP_GET, []() { server.send_P(200, "application/manifest+json", MANIFEST_JSON); });
     server.on("/icon.svg", HTTP_GET, []() { server.send_P(200, "image/svg+xml", ICON_SVG); });
+    server.on("/icon.png", HTTP_GET, []() { server.send_P(200, "image/png", (const char*)ICON_PNG, ICON_PNG_LEN); });
     server.onNotFound([]() { server.sendHeader("Location", "/"); server.send(302); });
     server.begin();
 
