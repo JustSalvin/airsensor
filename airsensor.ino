@@ -217,7 +217,7 @@ static void jsonNum(String& s, const char* key, float v, int dec) {
 }
 
 static void handleApiData() {
-    String s; s.reserve(320);
+    String s; s.reserve(300);
     s += "{\"state\":\""; s += stateApi(); s += "\",";
     s += "\"ageMs\":"; s += String(millis() - measStartMs); s += ',';
     if (latest.co2 >= 0) { s += "\"co2\":"; s += String(latest.co2); s += ','; }
@@ -230,8 +230,7 @@ static void handleApiData() {
     jsonNum(s, "pm10", latest.pm10, 1);
     jsonNum(s, "voc",  latest.voc, 0);
     jsonNum(s, "nox",  latest.nox, 0);
-    s += "\"faultFlags\":"; s += String(deviceStatusRaw); s += ',';
-    s += "\"room\":\"Living room\"}";     // Task 3 lo rende configurabile
+    s += "\"faultFlags\":"; s += String(deviceStatusRaw); s += '}';
     server.send(200, "application/json", s);
 }
 void sendData() {
