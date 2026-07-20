@@ -10,6 +10,7 @@
 #include <Preferences.h>
 #include <SensirionI2cSen66.h>
 #include "dashboard_html.h"
+#include "admin_html.h"
 
 #ifdef NO_ERROR
 #undef NO_ERROR
@@ -642,6 +643,7 @@ void setup() {
     if (MDNS.begin("airsensor")) MDNS.addService("http", "tcp", 80);
 
     server.on("/", HTTP_GET, []() { server.send_P(200, "text/html", DASHBOARD_HTML); });
+    server.on("/admin", HTTP_GET, []() { server.send_P(200, "text/html", ADMIN_HTML); });
     server.on("/api/data", HTTP_GET, handleApiData);
     server.on("/api/history", HTTP_GET, handleApiHistory);
     server.on("/api/settings", HTTP_GET, handleApiSettingsGet);

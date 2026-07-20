@@ -12,6 +12,18 @@ def data():
             "pm1": 3.1, "pm25": 4.2, "pm4": 5.0, "pm10": 6.8,
             "voc": 87, "nox": 12, "faultFlags": 16 if STATE == 'fault' else 0}
 
+def settings():
+    return {"altitude": 0, "usePressure": False, "pressure": 1013, "tempOffset": 0.0, "tempSlope": 0.0,
+            "vocPersist": True, "asc": True, "frcTarget": 420,
+            "vocIdxOff": 100, "vocLearnOff": 12, "vocLearnGain": 12, "vocGateMax": 180, "vocStdInit": 50, "vocGain": 230,
+            "noxIdxOff": 1, "noxLearnOff": 12, "noxGateMax": 720, "noxGain": 230}
+
+def device():
+    return {"product": "SEN66", "serial": "0F3A-77C2-19", "fw": "2.3",
+            "flags": {"fan": False, "rht": False, "gas": False, "co2a": False, "co2b": False, "pm": False, "speed": False},
+            "rssi": -58, "ip": "192.168.1.42", "heap": 191488, "uptimeS": 534720,
+            "lastFan": 1752305400, "lastHeat": 1749229920}
+
 def history():
     series = {}
     for k, base in [("co2", 620), ("pm1", 3), ("pm25", 4), ("pm4", 5), ("pm10", 7),
@@ -22,8 +34,10 @@ def history():
 
 class H(SimpleHTTPRequestHandler):
     def do_GET(self):
-        if self.path.startswith('/api/data'):    return self.j(data())
-        if self.path.startswith('/api/history'): return self.j(history())
+        if self.path.startswith('/api/data'):     return self.j(data())
+        if self.path.startswith('/api/history'):  return self.j(history())
+        if self.path.startswith('/api/settings'): return self.j(settings())
+        if self.path.startswith('/api/device'):   return self.j(device())
         if self.path == '/':      self.path = '/dev/dashboard.html'
         if self.path == '/admin': self.path = '/dev/admin.html'
         return super().do_GET()
