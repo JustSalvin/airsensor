@@ -1,18 +1,13 @@
 // ============================================================
-//  Air Quality Monitor - SEN66 + ESP32 + Blynk
-//  These 4 lines MUST come before the #includes
+//  Air Quality Monitor - SEN66 + ESP32 + local web server
 // ============================================================
-#define BLYNK_TEMPLATE_ID   "TMPL4BtE0B-t1"
-#define BLYNK_TEMPLATE_NAME "Air Sensor"
-#define BLYNK_AUTH_TOKEN    "Xs6wLLCdq7YWOktyuCa7HdREz7iOfIm-"
-#define BLYNK_PRINT Serial
-
 #include <Arduino.h>
 #include <Wire.h>
 #include <WiFi.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
 #include <time.h>
 #include <Preferences.h>
-#include <BlynkSimpleEsp32.h>
 #include <SensirionI2cSen66.h>
 
 #ifdef NO_ERROR
@@ -37,18 +32,6 @@ static constexpr int PIN_SCL = 23;   // yellow wire
 // ============================================================
 static constexpr uint32_t I2C_FREQ = 100000;
 
-static constexpr int VP_TEMP   = V0;
-static constexpr int VP_HUM    = V1;
-static constexpr int VP_PM1    = V2;
-static constexpr int VP_PM25   = V3;
-static constexpr int VP_PM4    = V4;
-static constexpr int VP_PM10   = V5;
-static constexpr int VP_CO2    = V6;
-static constexpr int VP_VOC    = V7;
-static constexpr int VP_NOX    = V8;
-static constexpr int VP_STATUS = V9;
-// V10 = reset learning, V11 = fan clean now, V12 = CO2 recal
-
 static constexpr long     SEND_INTERVAL_MS   = 10000;
 static constexpr long     MAINT_CHECK_MS     = 60UL * 60 * 1000;
 static constexpr uint32_t WARMUP_PM_MS       = 30UL * 1000;
@@ -58,45 +41,27 @@ static constexpr time_t   FAN_CLEAN_PERIOD_S = 7UL  * 24 * 3600;   // weekly
 static constexpr time_t   SHT_HEAT_PERIOD_S  = 30UL * 24 * 3600;   // monthly
 static constexpr time_t   TIME_VALID_AFTER   = 1700000000;
 
-// ---- Threshold colors (Blynk palette) ----
-static constexpr const char* COL_GREEN = "#23C48E";
-static constexpr const char* COL_AMBER = "#ED9D00";
-static constexpr const char* COL_RED   = "#D3435C";
-
-// ---- Alert thresholds (with hysteresis) ----
-// ON  = fires above this (matches the red color boundary)
-// OFF = rearms below this; the gap is what stops the alert from flapping
-static constexpr float CO2_ALERT_ON   = 1400;
-static constexpr float CO2_ALERT_OFF  = 1200;
-static constexpr float PM25_ALERT_ON  = 35;
-static constexpr float PM25_ALERT_OFF = 25;
-static constexpr float VOC_ALERT_ON   = 250;
-static constexpr float VOC_ALERT_OFF  = 200;
-static constexpr float NOX_ALERT_ON   = 100;
-static constexpr float NOX_ALERT_OFF  = 50;
-
 enum class SensorState { BOOT, WARMUP, GAS_CALIBRATION, READY, FAULT };
 
 SensirionI2cSen66 sensor;
-BlynkTimer timer;
+WebServer server(80);
+
+struct Latest {
+    float temp = NAN, hum = NAN;
+    float pm1 = NAN, pm25 = NAN, pm4 = NAN, pm10 = NAN;
+    float voc = NAN, nox = NAN;
+    int32_t co2 = -1;                 // -1 = not valid yet
+    uint32_t updatedAt = 0;           // millis() of last good read
+};
+static Latest latest;
+static uint32_t deviceStatusRaw = 0;  // refreshed each sendData()
+
 Preferences prefs;                     // stores ONLY the two maintenance dates
 
 static char errorMessage[128];
 static SensorState state     = SensorState::BOOT;
 static SensorState statePrev = SensorState::FAULT;
 static uint32_t measStartMs  = 0;
-
-// Remembers the current color per pin so we only write on change
-// (setProperty must never be spammed, per Blynk docs)
-static const char* lastCo2Col  = nullptr;
-static const char* lastPm25Col = nullptr;
-static const char* lastVocCol  = nullptr;
-
-// One latch per alert: true while the episode is ongoing
-static bool co2AlertActive  = false;
-static bool pm25AlertActive = false;
-static bool vocAlertActive  = false;
-static bool noxAlertActive  = false;
 
 // ------------------------------------------------------------
 //  Helpers
@@ -118,20 +83,6 @@ static time_t nowEpoch() {
     return (t > TIME_VALID_AFTER) ? t : 0;   // 0 = clock not synced yet
 }
 
-// Fires the event once per episode; rearms only after the value
-// drops back under offThreshold. Without the gap between the two
-// thresholds a value hovering on the edge would burn the
-// 100-events-per-day quota in minutes.
-static void checkAlert(float value, float onThreshold, float offThreshold,
-                       bool* active, const char* eventCode) {
-    if (!*active && value >= onThreshold) {
-        Blynk.logEvent(eventCode);
-        *active = true;
-    } else if (*active && value <= offThreshold) {
-        *active = false;
-    }
-}
-
 static const char* stateText(SensorState s) {
     switch (s) {
         case SensorState::BOOT:            return "Starting...";
@@ -145,45 +96,14 @@ static const char* stateText(SensorState s) {
 static void publishState(SensorState s) {
     state = s;
     if (s != statePrev) {
-        Blynk.virtualWrite(VP_STATUS, stateText(s));
-        Blynk.setProperty(VP_STATUS, "color",
-            s == SensorState::READY ? COL_GREEN :
-            s == SensorState::FAULT ? COL_RED   :
-                                       COL_AMBER);
         Serial.printf(">>> State: %s\n", stateText(s));
         statePrev = s;
     }
 }
 
-static void publishStatusText(const char* msg) {   // transient messages on V9
-    Blynk.virtualWrite(VP_STATUS, msg);
+static void publishStatusText(const char* msg) {   // transient messages
     Serial.printf(">>> %s\n", msg);
-    statePrev = SensorState::FAULT;   // force next publishState() to rewrite V9
-}
-
-static void setColorIfChanged(int vpin, const char* col, const char** last) {
-    if (col != *last) {
-        Blynk.setProperty(vpin, "color", col);
-        *last = col;
-    }
-}
-
-static const char* co2Color(uint16_t v) {
-    if (v < 1000) return COL_GREEN;
-    if (v < 1400) return COL_AMBER;
-    return COL_RED;
-}
-
-static const char* pm25Color(float v) {
-    if (v < 15)  return COL_GREEN;
-    if (v < 35)  return COL_AMBER;
-    return COL_RED;
-}
-
-static const char* vocColor(float v) {
-    if (v < 150) return COL_GREEN;
-    if (v < 250) return COL_AMBER;
-    return COL_RED;
+    statePrev = SensorState::FAULT;   // force next publishState() to log again
 }
 
 static bool scanBus() {
@@ -278,64 +198,42 @@ static void runMaintenanceIfDue() {
 }
 
 // ------------------------------------------------------------
-//  Admin controls
-// ------------------------------------------------------------
-// V10: full learning reset. Wipes VOC/NOx learning + maintenance dates.
-// Cannot wipe CO2 calibration (sensor NVM, no erase command exists).
-// Altitude is spared: config constant, reapplied at next start.
-BLYNK_WRITE(V10) {
-    if (param.asInt() != 1) return;
-    publishStatusText("Resetting learning...");
-
-    prefs.clear();
-    pauseMeasurement();
-    check(sensor.deviceReset(), "deviceReset()");   // the ONE legitimate use
-    delay(1500);
-
-    publishState(SensorState::BOOT);
-    if (startSensor()) publishState(SensorState::WARMUP);
-    Blynk.virtualWrite(V10, 0);
-}
-
-// V11: fan cleaning on demand
-BLYNK_WRITE(V11) {
-    if (param.asInt() != 1) return;
-    publishStatusText("Cleaning fan...");
-    pauseMeasurement();
-    doFanCleaning();
-    resumeMeasurement();
-    Blynk.virtualWrite(V11, 0);
-}
-
-// V12: forced CO2 recalibration.
-// ONLY with the sensor at an open window / outdoors, after measuring
-// there for at least 3 minutes.
-BLYNK_WRITE(V12) {
-    if (param.asInt() != 1) return;
-
-    if (millis() - measStartMs < MIN_RUN_BEFORE_FRC) {
-        publishStatusText("FRC refused: run >= 3 min first");
-        Blynk.virtualWrite(V12, 0);
-        return;
-    }
-
-    publishStatusText("CO2 recalibration...");
-    pauseMeasurement();                // datasheet: wait >= 1400 ms before FRC
-
-    uint16_t correction = 0;
-    if (check(sensor.performForcedCo2Recalibration(FRESH_AIR_CO2_PPM, correction),
-              "performForcedCo2Recalibration()")) {
-        if (correction == 0xFFFF) publishStatusText("CO2 recalibration FAILED");
-        else                      publishStatusText("CO2 recalibrated OK");
-    }
-    delay(500);
-    resumeMeasurement();
-    Blynk.virtualWrite(V12, 0);
-}
-
-// ------------------------------------------------------------
 //  Data publishing
 // ------------------------------------------------------------
+static const char* stateApi() {
+    switch (state) {
+        case SensorState::READY:           return "online";
+        case SensorState::GAS_CALIBRATION: return "calibrating";
+        case SensorState::FAULT:           return "fault";
+        default:                           return "warmup";   // BOOT + WARMUP
+    }
+}
+
+// Appends "key":value or "key":null. dec = decimals.
+static void jsonNum(String& s, const char* key, float v, int dec) {
+    s += '"'; s += key; s += "\":";
+    if (isnan(v)) s += "null"; else s += String(v, dec);
+    s += ',';
+}
+
+static void handleApiData() {
+    String s; s.reserve(320);
+    s += "{\"state\":\""; s += stateApi(); s += "\",";
+    s += "\"ageMs\":"; s += String(millis() - measStartMs); s += ',';
+    if (latest.co2 >= 0) { s += "\"co2\":"; s += String(latest.co2); s += ','; }
+    else                 { s += "\"co2\":null,"; }
+    jsonNum(s, "temp", latest.temp, 1);
+    jsonNum(s, "hum",  latest.hum, 1);
+    jsonNum(s, "pm1",  latest.pm1, 1);
+    jsonNum(s, "pm25", latest.pm25, 1);
+    jsonNum(s, "pm4",  latest.pm4, 1);
+    jsonNum(s, "pm10", latest.pm10, 1);
+    jsonNum(s, "voc",  latest.voc, 0);
+    jsonNum(s, "nox",  latest.nox, 0);
+    s += "\"faultFlags\":"; s += String(deviceStatusRaw); s += ',';
+    s += "\"room\":\"Living room\"}";     // Task 3 lo rende configurabile
+    server.send(200, "application/json", s);
+}
 void sendData() {
     if (state == SensorState::BOOT || state == SensorState::FAULT) {
         publishState(SensorState::FAULT);
@@ -359,36 +257,25 @@ void sendData() {
 
     uint32_t age = millis() - measStartMs;
 
-    if (plausible(temperature, -50, 100)) Blynk.virtualWrite(VP_TEMP, temperature);
-    if (plausible(humidity, 0, 100))      Blynk.virtualWrite(VP_HUM,  humidity);
+    if (plausible(temperature, -50, 100)) latest.temp = temperature;
+    if (plausible(humidity, 0, 100))      latest.hum  = humidity;
 
     if (age >= WARMUP_PM_MS) {         // PM muted during its 30 s warmup
-        if (plausible(pm1,   0, 1000)) Blynk.virtualWrite(VP_PM1,  pm1);
-        if (plausible(pm2p5, 0, 1000)) {
-            Blynk.virtualWrite(VP_PM25, pm2p5);
-            setColorIfChanged(VP_PM25, pm25Color(pm2p5), &lastPm25Col);
-            checkAlert(pm2p5, PM25_ALERT_ON, PM25_ALERT_OFF, &pm25AlertActive, "pm_high");
-        }
-        if (plausible(pm4,   0, 1000)) Blynk.virtualWrite(VP_PM4,  pm4);
-        if (plausible(pm10,  0, 1000)) Blynk.virtualWrite(VP_PM10, pm10);
+        if (plausible(pm1,   0, 1000)) latest.pm1  = pm1;
+        if (plausible(pm2p5, 0, 1000)) latest.pm25 = pm2p5;
+        if (plausible(pm4,   0, 1000)) latest.pm4  = pm4;
+        if (plausible(pm10,  0, 1000)) latest.pm10 = pm10;
     }
 
-    if (co2 != 0xFFFF && co2 <= 40000) {
-        Blynk.virtualWrite(VP_CO2, co2);
-        setColorIfChanged(VP_CO2, co2Color(co2), &lastCo2Col);
-        checkAlert(co2, CO2_ALERT_ON, CO2_ALERT_OFF, &co2AlertActive, "co2_high");
-    }
+    if (co2 != 0xFFFF && co2 <= 40000) latest.co2 = co2;
 
-    if (plausible(voc, 1, 500)) {
-        Blynk.virtualWrite(VP_VOC, voc);
-        setColorIfChanged(VP_VOC, vocColor(voc), &lastVocCol);
-        checkAlert(voc, VOC_ALERT_ON, VOC_ALERT_OFF, &vocAlertActive, "voc_high");
-    }
+    if (plausible(voc, 1, 500)) latest.voc = voc;
+    if (plausible(nox, 1, 500)) latest.nox = nox;
 
-    if (plausible(nox, 1, 500)) {
-        Blynk.virtualWrite(VP_NOX, nox);
-        checkAlert(nox, NOX_ALERT_ON, NOX_ALERT_OFF, &noxAlertActive, "nox_high");
-    }
+    latest.updatedAt = millis();
+
+    SEN66DeviceStatus ds;
+    if (sensor.readDeviceStatus(ds) == NO_ERROR) deviceStatusRaw = ds.value;
 
     if      (age < WARMUP_PM_MS)  publishState(SensorState::WARMUP);
     else if (age < WARMUP_NOX_MS) publishState(SensorState::GAS_CALIBRATION);
@@ -409,20 +296,26 @@ void setup() {
     prefs.begin("airsensor", false);
     Wire.begin(PIN_SDA, PIN_SCL, I2C_FREQ);
 
-    Serial.println("Connecting to WiFi and Blynk...");
-    Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
-    Serial.println("Connected.");
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, pass);
+    Serial.print("Connecting to WiFi");
+    while (WiFi.status() != WL_CONNECTED) { delay(300); Serial.print('.'); }
+    Serial.printf("\nConnected: %s\n", WiFi.localIP().toString().c_str());
+    if (MDNS.begin("airsensor")) MDNS.addService("http", "tcp", 80);
+
+    server.on("/api/data", HTTP_GET, handleApiData);
+    server.begin();
 
     configTime(0, 0, "pool.ntp.org");
 
     publishState(SensorState::BOOT);
     if (startSensor()) publishState(SensorState::WARMUP);
-
-    timer.setInterval(SEND_INTERVAL_MS, sendData);
-    timer.setInterval(MAINT_CHECK_MS,   runMaintenanceIfDue);
 }
 
 void loop() {
-    Blynk.run();
-    timer.run();
+    server.handleClient();
+    static uint32_t tSend = 0, tMaint = 0;
+    uint32_t now = millis();
+    if (now - tSend  >= SEND_INTERVAL_MS) { tSend  = now; sendData(); }
+    if (now - tMaint >= MAINT_CHECK_MS)   { tMaint = now; runMaintenanceIfDue(); }
 }
