@@ -536,8 +536,14 @@ static void handleApiCmd() {
     } else if (cmd == "reset_learning") {
         // Tuning back to defaults + learning wiped; maintenance dates kept.
         publishStatusText("Resetting learning...");
+        // Reset only VOC/NOx tuning to datasheet defaults; site config
+        // (altitude, pressure, temperature offset, ASC, FRC target) is kept.
         Settings fresh;
-        cfg = fresh;
+        cfg.vocIdxOff  = fresh.vocIdxOff;  cfg.vocLearnOff = fresh.vocLearnOff;
+        cfg.vocLearnGain = fresh.vocLearnGain; cfg.vocGateMax = fresh.vocGateMax;
+        cfg.vocStdInit = fresh.vocStdInit; cfg.vocGain = fresh.vocGain;
+        cfg.noxIdxOff  = fresh.noxIdxOff;  cfg.noxLearnOff = fresh.noxLearnOff;
+        cfg.noxGateMax = fresh.noxGateMax; cfg.noxGain = fresh.noxGain;
         saveSettings();
         prefs.remove("vocState");
         pauseMeasurement();

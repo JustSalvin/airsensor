@@ -466,7 +466,7 @@ function askVocReset(){
 }
 function askResetAll(){
   openConfirm('Reset all learning?',
-    'VOC and NOx learning states and stored baselines will be cleared. Indexes will need up to 24 h to settle again.',
+    'VOC and NOx learning states are cleared and their tuning parameters return to defaults. Indexes will need up to 24 h to settle again.',
     'Reset all', function(){
       runCmd('reset_learning', { btn:null }, 30000, function(){
         showToast('success', 'All learning states cleared'); resync(null);
