@@ -12,6 +12,18 @@
 #include "dashboard_html.h"
 #include "admin_html.h"
 
+static const char MANIFEST_JSON[] PROGMEM = R"JSON({
+  "name": "Air Sensor", "short_name": "Air",
+  "display": "standalone", "start_url": "/",
+  "background_color": "#0d1117", "theme_color": "#0d1117",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+})JSON";
+static const char ICON_SVG[] PROGMEM =
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+    "<rect width='100' height='100' rx='22' fill='#141b24'/>"
+    "<circle cx='50' cy='50' r='26' fill='none' stroke='#4fc98f' stroke-width='9'/>"
+    "<circle cx='50' cy='50' r='7' fill='#4fc98f'/></svg>";
+
 #ifdef NO_ERROR
 #undef NO_ERROR
 #endif
@@ -650,6 +662,9 @@ void setup() {
     server.on("/api/settings", HTTP_POST, handleApiSettingsPost);
     server.on("/api/cmd", HTTP_POST, handleApiCmd);
     server.on("/api/device", HTTP_GET, handleApiDevice);
+    server.on("/manifest.json", HTTP_GET, []() { server.send_P(200, "application/manifest+json", MANIFEST_JSON); });
+    server.on("/icon.svg", HTTP_GET, []() { server.send_P(200, "image/svg+xml", ICON_SVG); });
+    server.onNotFound([]() { server.sendHeader("Location", "/"); server.send(302); });
     server.begin();
 
     configTime(0, 0, "pool.ntp.org");
