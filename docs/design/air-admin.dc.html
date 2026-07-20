@@ -1,0 +1,359 @@
+<!-- Copia di riferimento del design Claude Design "Air Admin.dc.html"
+     (progetto e7167602-ca9e-459a-bb16-5a86cfe13c75).
+     NOTA IMPLEMENTAZIONE: ignorare ogni riferimento alla stanza -->
+<!-- ("Living room · SEN66" nell'header -> "SEN66"; sezione GENERAL/Room name: NON implementare). -->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0d1117;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#e7ecf2}
+a{color:#8ab4d8;text-decoration:none}a:hover{color:#b3d2ec}
+@keyframes spin{to{transform:rotate(360deg)}}
+button:disabled{opacity:.45;cursor:default}
+input:disabled{opacity:.4}
+input[type=number]::-webkit-inner-spin-button{opacity:.4}
+*{-webkit-tap-highlight-color:transparent}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;justify-content:center;background:#0d1117">
+<div style="width:100%;max-width:430px;padding:20px 18px 40px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px">
+
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px">
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="font-size:16px;font-weight:600;letter-spacing:.01em">Maintenance</div>
+      <div style="font-size:11.5px;color:#7a8595">Living room · SEN66</div>
+    </div>
+    <a href="Air Dashboard v2.dc.html" style="font-size:12.5px;padding:6px 0">← Dashboard</a>
+  </div>
+
+  <!-- 1. CO2 CALIBRATION -->
+  <div style="border-radius:16px;background:#141b24;border:1px solid #1f2937;padding:16px;display:flex;flex-direction:column">
+    <div style="font-size:11px;font-weight:600;color:#7a8595;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">CO₂ calibration</div>
+    <sc-for list="{{ co2Fields }}" as="f" hint-placeholder-count="1">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #1c2530">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13.5px;color:#c2ccd8">{{ f.label }}</span>
+          <span style="font-size:10.5px;color:#5a6675">{{ f.sub }}</span>
+        </div>
+        <input type="number" value="{{ f.value }}" min="{{ f.min }}" max="{{ f.max }}" step="{{ f.step }}" disabled="{{ f.disabled }}" onChange="{{ f.onChange }}" style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#e7ecf2;background:#101720;border:1px solid #1f2937;border-radius:10px;padding:9px 11px;width:96px;text-align:right;outline:none;box-sizing:content-box">
+      </div>
+    </sc-for>
+    <div style="display:flex;flex-direction:column;gap:6px;padding:12px 0;border-bottom:1px solid #1c2530">
+      <button onClick="{{ onFrc }}" disabled="{{ frcBusy }}" style="display:flex;align-items:center;justify-content:center;gap:8px;font-family:inherit;font-size:13px;font-weight:500;color:#9ec4e8;background:rgba(91,158,224,.13);border:1px solid rgba(91,158,224,.4);border-radius:10px;padding:11px 14px;cursor:pointer;min-height:44px" style-hover="background:rgba(91,158,224,.2)">
+        <sc-if value="{{ frcBusy }}" hint-placeholder-val="{{ false }}"><span style="width:12px;height:12px;border:2px solid rgba(158,196,232,.3);border-top-color:#9ec4e8;border-radius:50%;animation:spin .8s linear infinite"></span></sc-if>
+        <span>{{ frcLabel }}</span>
+      </button>
+      <span style="font-size:10.5px;color:#7a8595">Sensor must be running ≥ 3 min at an open window or outdoors</span>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #1c2530;min-height:44px;box-sizing:border-box">
+      <span style="font-size:13.5px;color:#c2ccd8">Automatic self-calibration (ASC)</span>
+      <div onClick="{{ toggleAsc }}" style="cursor:pointer;width:40px;height:22px;border-radius:11px;background:{{ ascBg }};padding:2px;box-sizing:border-box;transition:background .2s;flex:none">
+        <div style="width:18px;height:18px;border-radius:50%;background:#e7ecf2;transform:translateX({{ ascX }});transition:transform .2s"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px">
+      <button onClick="{{ askCo2Reset }}" style="font-family:inherit;font-size:12.5px;font-weight:500;color:#e06e5b;background:rgba(224,110,91,.08);border:1px solid rgba(224,110,91,.4);border-radius:10px;padding:9px 13px;cursor:pointer" style-hover="background:rgba(224,110,91,.15)">CO₂ factory reset</button>
+      <button onClick="{{ saveCo2 }}" disabled="{{ co2SaveDisabled }}" style="font-family:inherit;font-size:12.5px;font-weight:500;color:#0d1117;background:#8ab4d8;border:1px solid #8ab4d8;border-radius:10px;padding:9px 16px;cursor:pointer" style-hover="background:#a5c7e4">Save</button>
+    </div>
+  </div>
+
+  <!-- 2. ENVIRONMENT COMPENSATION -->
+  <div style="border-radius:16px;background:#141b24;border:1px solid #1f2937;padding:16px;display:flex;flex-direction:column">
+    <div style="font-size:11px;font-weight:600;color:#7a8595;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Environment compensation</div>
+    <sc-for list="{{ envTop }}" as="f" hint-placeholder-count="1">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #1c2530">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13.5px;color:#c2ccd8">{{ f.label }}</span>
+          <span style="font-size:10.5px;color:#5a6675">{{ f.sub }}</span>
+        </div>
+        <input type="number" value="{{ f.value }}" min="{{ f.min }}" max="{{ f.max }}" step="{{ f.step }}" disabled="{{ f.disabled }}" onChange="{{ f.onChange }}" style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#e7ecf2;background:#101720;border:1px solid #1f2937;border-radius:10px;padding:9px 11px;width:96px;text-align:right;outline:none;box-sizing:content-box">
+      </div>
+    </sc-for>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #1c2530;min-height:44px;box-sizing:border-box">
+      <span style="font-size:13.5px;color:#c2ccd8">Use ambient pressure instead</span>
+      <div onClick="{{ togglePressure }}" style="cursor:pointer;width:40px;height:22px;border-radius:11px;background:{{ presBg }};padding:2px;box-sizing:border-box;transition:background .2s;flex:none">
+        <div style="width:18px;height:18px;border-radius:50%;background:#e7ecf2;transform:translateX({{ presX }});transition:transform .2s"></div>
+      </div>
+    </div>
+    <sc-for list="{{ envRest }}" as="f" hint-placeholder-count="3">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #1c2530">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13.5px;color:#c2ccd8">{{ f.label }}</span>
+          <span style="font-size:10.5px;color:#5a6675">{{ f.sub }}</span>
+        </div>
+        <input type="number" value="{{ f.value }}" min="{{ f.min }}" max="{{ f.max }}" step="{{ f.step }}" disabled="{{ f.disabled }}" onChange="{{ f.onChange }}" style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#e7ecf2;background:#101720;border:1px solid #1f2937;border-radius:10px;padding:9px 11px;width:96px;text-align:right;outline:none;box-sizing:content-box">
+      </div>
+    </sc-for>
+    <div style="display:flex;justify-content:flex-end;padding-top:12px">
+      <button onClick="{{ saveEnv }}" disabled="{{ envSaveDisabled }}" style="font-family:inherit;font-size:12.5px;font-weight:500;color:#0d1117;background:#8ab4d8;border:1px solid #8ab4d8;border-radius:10px;padding:9px 16px;cursor:pointer" style-hover="background:#a5c7e4">Save</button>
+    </div>
+  </div>
+
+  <!-- 3. VOC TUNING -->
+  <div style="border-radius:16px;background:#141b24;border:1px solid #1f2937;padding:16px;display:flex;flex-direction:column">
+    <div style="font-size:11px;font-weight:600;color:#7a8595;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">VOC tuning</div>
+    <sc-for list="{{ vocFields }}" as="f" hint-placeholder-count="6">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #1c2530">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13.5px;color:#c2ccd8">{{ f.label }}</span>
+          <span style="font-size:10.5px;color:#5a6675">{{ f.sub }}</span>
+        </div>
+        <input type="number" value="{{ f.value }}" min="{{ f.min }}" max="{{ f.max }}" step="{{ f.step }}" disabled="{{ f.disabled }}" onChange="{{ f.onChange }}" style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#e7ecf2;background:#101720;border:1px solid #1f2937;border-radius:10px;padding:9px 11px;width:96px;text-align:right;outline:none;box-sizing:content-box">
+      </div>
+    </sc-for>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #1c2530;min-height:44px;box-sizing:border-box">
+      <span style="font-size:13.5px;color:#c2ccd8">Persist VOC learning</span>
+      <div onClick="{{ togglePersistVoc }}" style="cursor:pointer;width:40px;height:22px;border-radius:11px;background:{{ pvBg }};padding:2px;box-sizing:border-box;transition:background .2s;flex:none">
+        <div style="width:18px;height:18px;border-radius:50%;background:#e7ecf2;transform:translateX({{ pvX }});transition:transform .2s"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px">
+      <button onClick="{{ askVocReset }}" style="font-family:inherit;font-size:12.5px;font-weight:500;color:#e06e5b;background:rgba(224,110,91,.08);border:1px solid rgba(224,110,91,.4);border-radius:10px;padding:9px 13px;cursor:pointer" style-hover="background:rgba(224,110,91,.15)">Reset VOC learning</button>
+      <button onClick="{{ saveVoc }}" disabled="{{ vocSaveDisabled }}" style="font-family:inherit;font-size:12.5px;font-weight:500;color:#0d1117;background:#8ab4d8;border:1px solid #8ab4d8;border-radius:10px;padding:9px 16px;cursor:pointer" style-hover="background:#a5c7e4">Save</button>
+    </div>
+  </div>
+
+  <!-- 4. NOX TUNING -->
+  <div style="border-radius:16px;background:#141b24;border:1px solid #1f2937;padding:16px;display:flex;flex-direction:column">
+    <div style="font-size:11px;font-weight:600;color:#7a8595;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">NOx tuning</div>
+    <sc-for list="{{ noxFields }}" as="f" hint-placeholder-count="4">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #1c2530">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="font-size:13.5px;color:#c2ccd8">{{ f.label }}</span>
+          <span style="font-size:10.5px;color:#5a6675">{{ f.sub }}</span>
+        </div>
+        <input type="number" value="{{ f.value }}" min="{{ f.min }}" max="{{ f.max }}" step="{{ f.step }}" disabled="{{ f.disabled }}" onChange="{{ f.onChange }}" style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#e7ecf2;background:#101720;border:1px solid #1f2937;border-radius:10px;padding:9px 11px;width:96px;text-align:right;outline:none;box-sizing:content-box">
+      </div>
+    </sc-for>
+    <div style="display:flex;justify-content:flex-end;padding-top:12px">
+      <button onClick="{{ saveNox }}" disabled="{{ noxSaveDisabled }}" style="font-family:inherit;font-size:12.5px;font-weight:500;color:#0d1117;background:#8ab4d8;border:1px solid #8ab4d8;border-radius:10px;padding:9px 16px;cursor:pointer" style-hover="background:#a5c7e4">Save</button>
+    </div>
+  </div>
+
+  <!-- 5. MAINTENANCE -->
+  <div style="border-radius:16px;background:#141b24;border:1px solid #1f2937;padding:16px;display:flex;flex-direction:column">
+    <div style="font-size:11px;font-weight:600;color:#7a8595;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Maintenance</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #1c2530">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:13.5px;color:#c2ccd8">Fan cleaning</span>
+        <span style="font-size:10.5px;color:#5a6675">Last run 12 Jul 2026 · 08:30 — ~15 s, measurement pauses</span>
+      </div>
+      <button onClick="{{ onFan }}" disabled="{{ fanBusy }}" style="display:flex;align-items:center;gap:7px;font-family:inherit;font-size:12.5px;font-weight:500;color:#9ec4e8;background:rgba(91,158,224,.13);border:1px solid rgba(91,158,224,.4);border-radius:10px;padding:9px 13px;cursor:pointer;flex:none;min-height:40px" style-hover="background:rgba(91,158,224,.2)">
+        <sc-if value="{{ fanBusy }}" hint-placeholder-val="{{ false }}"><span style="width:11px;height:11px;border:2px solid rgba(158,196,232,.3);border-top-color:#9ec4e8;border-radius:50%;animation:spin .8s linear infinite"></span></sc-if>
+        <span>{{ fanLabel }}</span>
+      </button>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #1c2530">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:13.5px;color:#c2ccd8">SHT heater cycle</span>
+        <span style="font-size:10.5px;color:#5a6675">Last run 03 Jun 2026 · 17:12 — ~25 s</span>
+      </div>
+      <button onClick="{{ onHeater }}" disabled="{{ heaterBusy }}" style="display:flex;align-items:center;gap:7px;font-family:inherit;font-size:12.5px;font-weight:500;color:#9ec4e8;background:rgba(91,158,224,.13);border:1px solid rgba(91,158,224,.4);border-radius:10px;padding:9px 13px;cursor:pointer;flex:none;min-height:40px" style-hover="background:rgba(91,158,224,.2)">
+        <sc-if value="{{ heaterBusy }}" hint-placeholder-val="{{ false }}"><span style="width:11px;height:11px;border:2px solid rgba(158,196,232,.3);border-top-color:#9ec4e8;border-radius:50%;animation:spin .8s linear infinite"></span></sc-if>
+        <span>{{ heaterLabel }}</span>
+      </button>
+    </div>
+    <div style="padding-top:12px">
+      <button onClick="{{ askResetAll }}" style="font-family:inherit;font-size:12.5px;font-weight:500;color:#e06e5b;background:rgba(224,110,91,.08);border:1px solid rgba(224,110,91,.4);border-radius:10px;padding:9px 13px;cursor:pointer" style-hover="background:rgba(224,110,91,.15)">Reset all learning</button>
+    </div>
+  </div>
+
+  <!-- 6. GENERAL -->
+  <div style="border-radius:16px;background:#141b24;border:1px solid #1f2937;padding:16px;display:flex;flex-direction:column">
+    <div style="font-size:11px;font-weight:600;color:#7a8595;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">General</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #1c2530">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <span style="font-size:13.5px;color:#c2ccd8">Room name</span>
+        <span style="font-size:10.5px;color:#5a6675">max 31 characters</span>
+      </div>
+      <input type="text" value="{{ roomName }}" maxLength="31" onChange="{{ onRoomName }}" style="font-family:inherit;font-size:13.5px;color:#e7ecf2;background:#101720;border:1px solid #1f2937;border-radius:10px;padding:9px 11px;width:150px;outline:none;box-sizing:content-box">
+    </div>
+    <div style="display:flex;justify-content:flex-end;padding-top:12px">
+      <button onClick="{{ saveGeneral }}" disabled="{{ generalSaveDisabled }}" style="font-family:inherit;font-size:12.5px;font-weight:500;color:#0d1117;background:#8ab4d8;border:1px solid #8ab4d8;border-radius:10px;padding:9px 16px;cursor:pointer" style-hover="background:#a5c7e4">Save</button>
+    </div>
+  </div>
+
+  <!-- 7. DEVICE -->
+  <div style="border-radius:16px;background:#141b24;border:1px solid #1f2937;padding:16px;display:flex;flex-direction:column">
+    <div style="font-size:11px;font-weight:600;color:#7a8595;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Device</div>
+    <sc-for list="{{ deviceRows }}" as="r" hint-placeholder-count="7">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #1c2530">
+        <span style="font-size:12.5px;color:#7a8595">{{ r.k }}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#c2ccd8">{{ r.v }}</span>
+      </div>
+    </sc-for>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:14px 0;border-bottom:1px solid #1c2530">
+      <sc-for list="{{ flags }}" as="fl" hint-placeholder-count="7">
+        <div style="display:flex;align-items:center;gap:6px;border:1px solid #1c2530;border-radius:9px;padding:7px 8px;background:#101720">
+          <span style="width:7px;height:7px;border-radius:50%;background:{{ fl.color }};flex:none"></span>
+          <span style="font-size:10.5px;color:#c2ccd8;white-space:nowrap">{{ fl.name }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="padding-top:12px">
+      <button onClick="{{ clearFlags }}" style="font-family:inherit;font-size:12.5px;font-weight:500;color:#c2ccd8;background:transparent;border:1px solid #2c3b4e;border-radius:10px;padding:9px 13px;cursor:pointer" style-hover="background:#18202b">Clear sticky flags</button>
+    </div>
+  </div>
+
+  <!-- confirm dialog -->
+  <sc-if value="{{ confirmShow }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ confirmCancel }}" style="position:fixed;inset:0;background:rgba(5,8,12,.72);backdrop-filter:blur(3px);z-index:60;display:flex;align-items:center;justify-content:center;padding:24px">
+      <div onClick="{{ stop }}" style="width:100%;max-width:340px;background:#151d27;border:1px solid #24303f;border-radius:18px;padding:20px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:15px;font-weight:600">{{ confirmTitle }}</div>
+        <div style="font-size:13px;color:#9aa5b3;line-height:1.5">{{ confirmMsg }}</div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+          <button onClick="{{ confirmCancel }}" style="font-family:inherit;font-size:12.5px;font-weight:500;color:#c2ccd8;background:transparent;border:1px solid #2c3b4e;border-radius:10px;padding:9px 14px;cursor:pointer" style-hover="background:#18202b">Cancel</button>
+          <button onClick="{{ confirmYes }}" style="font-family:inherit;font-size:12.5px;font-weight:500;color:#fff;background:#c9503c;border:1px solid #c9503c;border-radius:10px;padding:9px 14px;cursor:pointer" style-hover="background:#d96450">{{ confirmLabel }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- toast -->
+  <sc-if value="{{ toastShow }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;bottom:20px;left:0;right:0;display:flex;justify-content:center;z-index:70;pointer-events:none;padding:0 18px">
+      <div style="display:flex;align-items:center;gap:9px;background:#151d27;border:1px solid {{ toastBorder }};border-radius:12px;padding:11px 16px;box-shadow:0 8px 24px rgba(0,0,0,.4)">
+        <span style="width:8px;height:8px;border-radius:50%;background:{{ toastDot }};flex:none"></span>
+        <span style="font-size:12.5px;color:#e7ecf2">{{ toastMsg }}</span>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 430, &quot;height&quot;: 1400}, &quot;busy&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;none&quot;, &quot;frc&quot;, &quot;fan&quot;, &quot;heater&quot;], &quot;default&quot;: &quot;none&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Simulation&quot;}, &quot;toast&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;none&quot;, &quot;success&quot;, &quot;error&quot;], &quot;default&quot;: &quot;none&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Simulation&quot;}, &quot;confirmOpen&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Simulation&quot;}, &quot;frcFail&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Simulation&quot;}, &quot;fault&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;none&quot;, &quot;fan&quot;, &quot;pm&quot;, &quot;co2&quot;], &quot;default&quot;: &quot;none&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Simulation&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const d = {
+      frcTarget: 420, asc: true,
+      altitude: 0, usePressure: false, pressure: 1013, tOffset: 0, tSlope: 0,
+      vocOffset: 100, vocLearnOffset: 12, vocLearnGain: 12, vocGating: 180, vocStd: 50, vocGain: 230, persistVoc: true,
+      noxOffset: 1, noxLearnOffset: 12, noxGating: 720, noxGain: 230,
+      roomName: 'Living room',
+    };
+    this.state = { values: { ...d }, saved: { ...d }, busy: null, toast: null, confirm: null };
+  }
+
+  setVal(k, v) { this.setState(s => ({ values: { ...s.values, [k]: v } })); }
+  numField(k, label, sub, min, max, step, disabled) {
+    return { label, sub, min, max, step: step || 1, disabled: !!disabled, value: this.state.values[k],
+      onChange: (e) => this.setVal(k, e.target.value === '' ? '' : Number(e.target.value)) };
+  }
+  dirty(keys) { return keys.some(k => this.state.values[k] !== this.state.saved[k]); }
+
+  showToast(type, msg) {
+    clearTimeout(this._tt);
+    this.setState({ toast: { type, msg } });
+    this._tt = setTimeout(() => this.setState({ toast: null }), 3000);
+  }
+  save(keys) {
+    if (!this.dirty(keys)) return;
+    this.setState(s => {
+      const saved = { ...s.saved };
+      keys.forEach(k => saved[k] = s.values[k]);
+      return { saved };
+    });
+    this.showToast('success', 'Settings saved');
+  }
+  action(key, ms, done) {
+    if (this.state.busy) return;
+    this.setState({ busy: key });
+    setTimeout(() => { this.setState({ busy: null }); done(); }, ms);
+  }
+  toggle(k) { this.setVal(k, !this.state.values[k]); }
+
+  renderVals() {
+    const V = this.state.values;
+    const busy = (this.props.busy && this.props.busy !== 'none') ? this.props.busy : this.state.busy;
+    let toast = this.state.toast;
+    if (this.props.toast === 'success') toast = { type: 'success', msg: 'Settings saved' };
+    if (this.props.toast === 'error') toast = { type: 'error', msg: 'FRC failed — run ≥ 3 min first' };
+    let confirm = this.state.confirm;
+    if (this.props.confirmOpen) confirm = { title: 'Reset VOC learning?', msg: 'The VOC baseline learned over the past days will be cleared. The index will need ~12 h to settle again.', label: 'Reset', fn: () => {} };
+    const fault = this.props.fault ?? 'none';
+    const flagDefs = [
+      ['Fan', fault === 'fan'], ['RHT', false], ['Gas', false],
+      ['CO₂ A', false], ['CO₂ B', fault === 'co2'], ['PM', fault === 'pm'], ['Fan speed', fault === 'fan'],
+    ];
+    const co2Keys = ['frcTarget', 'asc'];
+    const envKeys = ['altitude', 'usePressure', 'pressure', 'tOffset', 'tSlope'];
+    const vocKeys = ['vocOffset', 'vocLearnOffset', 'vocLearnGain', 'vocGating', 'vocStd', 'vocGain', 'persistVoc'];
+    const noxKeys = ['noxOffset', 'noxLearnOffset', 'noxGating', 'noxGain'];
+    const tOn = '#4f7ea8', tOff = '#2c3b4e';
+    const confirmDialog = (title, msg, label, doneMsg) => () =>
+      this.setState({ confirm: { title, msg, label, fn: () => { this.setState({ confirm: null }); this.showToast('success', doneMsg); } } });
+    return {
+      co2Fields: [this.numField('frcTarget', 'FRC target', 'ppm · 0–2000 · default 420', 0, 2000)],
+      envTop: [this.numField('altitude', 'Altitude', 'm · 0–3000', 0, 3000)],
+      envRest: [
+        this.numField('pressure', 'Ambient pressure', 'hPa · 700–1200', 700, 1200, 1, !V.usePressure),
+        this.numField('tOffset', 'Temperature offset', '°C · −10…10', -10, 10, 0.1),
+        this.numField('tSlope', 'Temperature slope', '−1…1', -1, 1, 0.001),
+      ],
+      vocFields: [
+        this.numField('vocOffset', 'Index offset', '1–250 · default 100', 1, 250),
+        this.numField('vocLearnOffset', 'Learning time offset', 'h · 1–1000 · default 12', 1, 1000),
+        this.numField('vocLearnGain', 'Learning time gain', 'h · 1–1000 · default 12', 1, 1000),
+        this.numField('vocGating', 'Gating max duration', 'min · 0–3000 · default 180', 0, 3000),
+        this.numField('vocStd', 'Std initial', '10–5000 · default 50', 10, 5000),
+        this.numField('vocGain', 'Gain factor', '1–1000 · default 230', 1, 1000),
+      ],
+      noxFields: [
+        this.numField('noxOffset', 'Index offset', '1–250 · default 1', 1, 250),
+        this.numField('noxLearnOffset', 'Learning time offset', 'h · 1–1000 · default 12', 1, 1000),
+        this.numField('noxGating', 'Gating max duration', 'min · 0–3000 · default 720', 0, 3000),
+        this.numField('noxGain', 'Gain factor', '1–1000 · default 230', 1, 1000),
+      ],
+      ascBg: V.asc ? tOn : tOff, ascX: V.asc ? '18px' : '0px', toggleAsc: () => this.toggle('asc'),
+      presBg: V.usePressure ? tOn : tOff, presX: V.usePressure ? '18px' : '0px', togglePressure: () => this.toggle('usePressure'),
+      pvBg: V.persistVoc ? tOn : tOff, pvX: V.persistVoc ? '18px' : '0px', togglePersistVoc: () => this.toggle('persistVoc'),
+      saveCo2: () => this.save(co2Keys), co2SaveDisabled: !this.dirty(co2Keys),
+      saveEnv: () => this.save(envKeys), envSaveDisabled: !this.dirty(envKeys),
+      saveVoc: () => this.save(vocKeys), vocSaveDisabled: !this.dirty(vocKeys),
+      saveNox: () => this.save(noxKeys), noxSaveDisabled: !this.dirty(noxKeys),
+      roomName: V.roomName, onRoomName: (e) => this.setVal('roomName', e.target.value.slice(0, 31)),
+      saveGeneral: () => this.save(['roomName']), generalSaveDisabled: !this.dirty(['roomName']),
+      frcBusy: busy === 'frc', frcLabel: busy === 'frc' ? 'Working…' : 'Recalibrate now',
+      onFrc: () => this.action('frc', 1600, () => {
+        if (this.props.frcFail) this.showToast('error', 'FRC failed — run ≥ 3 min first');
+        else this.showToast('success', 'FRC complete · correction −14 ppm');
+      }),
+      fanBusy: busy === 'fan', fanLabel: busy === 'fan' ? 'Working…' : 'Clean now',
+      onFan: () => this.action('fan', 1600, () => this.showToast('success', 'Fan cleaning complete')),
+      heaterBusy: busy === 'heater', heaterLabel: busy === 'heater' ? 'Working…' : 'Run cycle',
+      onHeater: () => this.action('heater', 1600, () => this.showToast('success', 'Heater cycle complete')),
+      askCo2Reset: confirmDialog('CO₂ factory reset?', 'All FRC and ASC corrections will be discarded and the CO₂ sensor returns to factory calibration. This cannot be undone.', 'Reset', 'CO₂ calibration reset to factory'),
+      askVocReset: confirmDialog('Reset VOC learning?', 'The VOC baseline learned over the past days will be cleared. The index will need ~12 h to settle again.', 'Reset', 'VOC learning cleared'),
+      askResetAll: confirmDialog('Reset all learning?', 'VOC and NOx learning states and stored baselines will be cleared. Indexes will need up to 24 h to settle again.', 'Reset all', 'All learning states cleared'),
+      confirmShow: !!confirm,
+      confirmTitle: confirm ? confirm.title : '', confirmMsg: confirm ? confirm.msg : '', confirmLabel: confirm ? confirm.label : '',
+      confirmYes: () => { if (confirm && confirm.fn) confirm.fn(); },
+      confirmCancel: () => this.setState({ confirm: null }),
+      stop: (e) => e.stopPropagation(),
+      clearFlags: () => this.showToast('success', 'Sticky flags cleared'),
+      deviceRows: [
+        { k: 'Product', v: 'SEN66' }, { k: 'Serial', v: '0F3A-77C2-19' }, { k: 'Firmware', v: 'SEN66 2.3.1 · ESP32 1.8.0' },
+        { k: 'IP', v: '192.168.1.42' }, { k: 'Wi-Fi RSSI', v: '−58 dBm' }, { k: 'Free heap', v: '187 kB' }, { k: 'Uptime', v: '6d 4h 12m' },
+      ],
+      flags: flagDefs.map(([name, err]) => ({ name, color: err ? '#e06e5b' : '#4fc98f' })),
+      toastShow: !!toast,
+      toastMsg: toast ? toast.msg : '',
+      toastDot: toast && toast.type === 'error' ? '#e06e5b' : '#4fc98f',
+      toastBorder: toast && toast.type === 'error' ? 'rgba(224,110,91,.4)' : 'rgba(79,201,143,.35)',
+    };
+  }
+}
+</script>
+</body>
+</html>

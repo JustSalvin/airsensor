@@ -1,0 +1,543 @@
+// AUTO-GENERATED from dev/admin.html by dev/embed.py - DO NOT EDIT
+#pragma once
+static const char ADMIN_HTML[] PROGMEM = R"HTMLDOC(<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Air Sensor · Maintenance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" onerror="">
+<style>
+  body{margin:0;background:#0d1117;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#e7ecf2}
+  a{color:#8ab4d8;text-decoration:none}a:hover{color:#b3d2ec}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  *{-webkit-tap-highlight-color:transparent}
+  button:disabled{opacity:.45;cursor:default}
+  input:disabled{opacity:.4}
+  input[type=number]::-webkit-inner-spin-button{opacity:.4}
+  [hidden]{display:none !important}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+
+  .wrap{min-height:100vh;display:flex;justify-content:center;background:#0d1117}
+  .page{width:100%;max-width:430px;padding:20px 18px 40px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
+
+  .header{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+  .header-titles{display:flex;flex-direction:column;gap:2px}
+  .title{font-size:16px;font-weight:600;letter-spacing:.01em}
+  .subtitle{font-size:11.5px;color:#7a8595}
+
+  .iconbtn{width:34px;height:34px;border-radius:50%;background:#141b24;border:1px solid #1f2937;display:flex;align-items:center;justify-content:center;flex:none}
+  .iconbtn:hover{border-color:#2c3b4e;background:#18202b}
+  .iconbtn:hover svg{stroke:#c2ccd8}
+
+  .body{display:flex;flex-direction:column;gap:14px}
+  .col{display:flex;flex-direction:column;gap:14px}
+
+  .card{border-radius:16px;background:#141b24;border:1px solid #1f2937;padding:16px;display:flex;flex-direction:column}
+  .card-label{font-size:11px;font-weight:600;color:#7a8595;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #1c2530}
+  .row-labels{display:flex;flex-direction:column;gap:2px}
+  .row-label{font-size:13.5px;color:#c2ccd8}
+  .row-sub{font-size:10.5px;color:#5a6675}
+  .num{font-family:'IBM Plex Mono',monospace;font-size:14px;color:#e7ecf2;background:#101720;border:1px solid #1f2937;border-radius:10px;padding:9px 11px;width:96px;text-align:right;outline:none;box-sizing:content-box;flex:none}
+
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #1c2530;min-height:44px;box-sizing:border-box}
+  .toggle{cursor:pointer;width:40px;height:22px;border-radius:11px;background:#2c3b4e;padding:2px;box-sizing:border-box;transition:background .2s;flex:none}
+  .knob{width:18px;height:18px;border-radius:50%;background:#e7ecf2;transition:transform .2s}
+
+  .frc-block{display:flex;flex-direction:column;gap:6px;padding:12px 0;border-bottom:1px solid #1c2530}
+  .hint{font-size:10.5px;color:#7a8595}
+
+  .btn{font-family:inherit;font-weight:500;border-radius:10px;cursor:pointer}
+  .btn-primary{font-size:12.5px;color:#0d1117;background:#8ab4d8;border:1px solid #8ab4d8;padding:9px 16px}
+  .btn-primary:not(:disabled):hover{background:#a5c7e4}
+  .btn-blue{display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;color:#9ec4e8;background:rgba(91,158,224,.13);border:1px solid rgba(91,158,224,.4);padding:11px 14px;min-height:44px}
+  .btn-blue.small{font-size:12.5px;gap:7px;padding:9px 13px;min-height:40px;flex:none}
+  .btn-blue:not(:disabled):hover{background:rgba(91,158,224,.2)}
+  .btn-danger{font-size:12.5px;color:#e06e5b;background:rgba(224,110,91,.08);border:1px solid rgba(224,110,91,.4);padding:9px 13px}
+  .btn-danger:hover{background:rgba(224,110,91,.15)}
+  .btn-neutral{font-size:12.5px;color:#c2ccd8;background:transparent;border:1px solid #2c3b4e;padding:9px 13px}
+  .btn-neutral:hover{background:#18202b}
+  .spin{width:12px;height:12px;border:2px solid rgba(158,196,232,.3);border-top-color:#9ec4e8;border-radius:50%;animation:spin .8s linear infinite;flex:none}
+  .spin.small{width:11px;height:11px}
+
+  .actions{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px}
+  .actions.end{justify-content:flex-end}
+
+  .dev-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid #1c2530}
+  .dev-k{font-size:12.5px;color:#7a8595}
+  .dev-v{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:#c2ccd8;text-align:right}
+  .flag-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:14px 0;border-bottom:1px solid #1c2530}
+  .flag{display:flex;align-items:center;gap:6px;border:1px solid #1c2530;border-radius:9px;padding:7px 8px;background:#101720}
+  .flag-dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .flag-name{font-size:10.5px;color:#c2ccd8;white-space:nowrap}
+
+  .overlay{position:fixed;inset:0;background:rgba(5,8,12,.72);backdrop-filter:blur(3px);z-index:60;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box}
+  .dialog{width:100%;max-width:340px;background:#151d27;border:1px solid #24303f;border-radius:18px;padding:20px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px}
+  .dialog-title{font-size:15px;font-weight:600}
+  .dialog-msg{font-size:13px;color:#9aa5b3;line-height:1.5}
+  .dialog-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+  .btn-cancel{font-size:12.5px;color:#c2ccd8;background:transparent;border:1px solid #2c3b4e;padding:9px 14px}
+  .btn-cancel:hover{background:#18202b}
+  .btn-confirm{font-size:12.5px;color:#fff;background:#c9503c;border:1px solid #c9503c;padding:9px 14px}
+  .btn-confirm:hover{background:#d96450}
+
+  .toast-wrap{position:fixed;bottom:20px;left:0;right:0;display:flex;justify-content:center;z-index:70;pointer-events:none;padding:0 18px}
+  .toast{display:flex;align-items:center;gap:9px;background:#151d27;border:1px solid rgba(79,201,143,.35);border-radius:12px;padding:11px 16px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .toast-dot{width:8px;height:8px;border-radius:50%;background:#4fc98f;flex:none}
+  .toast-msg{font-size:12.5px;color:#e7ecf2}
+
+  @media (min-width:700px){
+    .page{max-width:920px;padding:28px 24px 40px}
+    .body{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="page">
+
+  <div class="header">
+    <a class="iconbtn" href="/" aria-label="Back to dashboard">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#7a8595" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="13" y1="8" x2="3" y2="8"></line>
+        <polyline points="7,4 3,8 7,12"></polyline>
+      </svg>
+    </a>
+    <div class="header-titles">
+      <div class="title">Maintenance</div>
+      <div class="subtitle">SEN66</div>
+    </div>
+  </div>
+
+  <div class="body">
+    <!-- LEFT COLUMN -->
+    <div class="col">
+
+      <!-- 1. CO2 CALIBRATION -->
+      <div class="card">
+        <div class="card-label">CO&#8322; calibration</div>
+        <div id="co2Fields"></div>
+        <div class="frc-block">
+          <button class="btn btn-blue" id="frcBtn" onclick="onFrc()">
+            <span class="spin" id="frcSpin" hidden></span>
+            <span id="frcLabel">Recalibrate now</span>
+          </button>
+          <span class="hint">Sensor must be running &ge; 3 min at an open window or outdoors</span>
+        </div>
+        <div class="toggle-row">
+          <span class="row-label">Automatic self-calibration (ASC)</span>
+          <div class="toggle" id="ascToggle" onclick="toggleKey('asc')"><div class="knob" id="ascKnob"></div></div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-danger" onclick="askCo2Reset()">CO&#8322; factory reset</button>
+          <button class="btn btn-primary" id="saveCo2" onclick="saveSection('co2')" disabled>Save</button>
+        </div>
+      </div>
+
+      <!-- 2. ENVIRONMENT COMPENSATION -->
+      <div class="card">
+        <div class="card-label">Environment compensation</div>
+        <div id="envTop"></div>
+        <div class="toggle-row">
+          <span class="row-label">Use ambient pressure instead</span>
+          <div class="toggle" id="presToggle" onclick="toggleKey('usePressure')"><div class="knob" id="presKnob"></div></div>
+        </div>
+        <div id="envRest"></div>
+        <div class="actions end">
+          <button class="btn btn-primary" id="saveEnv" onclick="saveSection('env')" disabled>Save</button>
+        </div>
+      </div>
+
+      <!-- 3. VOC TUNING -->
+      <div class="card">
+        <div class="card-label">VOC tuning</div>
+        <div id="vocFields"></div>
+        <div class="toggle-row">
+          <span class="row-label">Persist VOC learning</span>
+          <div class="toggle" id="pvToggle" onclick="toggleKey('persistVoc')"><div class="knob" id="pvKnob"></div></div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-danger" onclick="askVocReset()">Reset VOC learning</button>
+          <button class="btn btn-primary" id="saveVoc" onclick="saveSection('voc')" disabled>Save</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="col">
+
+      <!-- 4. NOX TUNING -->
+      <div class="card">
+        <div class="card-label">NOx tuning</div>
+        <div id="noxFields"></div>
+        <div class="actions end">
+          <button class="btn btn-primary" id="saveNox" onclick="saveSection('nox')" disabled>Save</button>
+        </div>
+      </div>
+
+      <!-- 5. MAINTENANCE -->
+      <div class="card">
+        <div class="card-label">Maintenance</div>
+        <div class="row">
+          <div class="row-labels">
+            <span class="row-label">Fan cleaning</span>
+            <span class="row-sub" id="fanSub">&mdash;</span>
+          </div>
+          <button class="btn btn-blue small" id="fanBtn" onclick="onFan()">
+            <span class="spin small" id="fanSpin" hidden></span>
+            <span id="fanLabel">Clean now</span>
+          </button>
+        </div>
+        <div class="row">
+          <div class="row-labels">
+            <span class="row-label">SHT heater cycle</span>
+            <span class="row-sub" id="heatSub">&mdash;</span>
+          </div>
+          <button class="btn btn-blue small" id="heatBtn" onclick="onHeater()">
+            <span class="spin small" id="heatSpin" hidden></span>
+            <span id="heatLabel">Run cycle</span>
+          </button>
+        </div>
+        <div style="padding-top:12px">
+          <button class="btn btn-danger" onclick="askResetAll()">Reset all learning</button>
+        </div>
+      </div>
+
+      <!-- 6. DEVICE -->
+      <div class="card">
+        <div class="card-label">Device</div>
+        <div id="deviceRows"></div>
+        <div class="flag-grid" id="flagGrid"></div>
+        <div style="padding-top:12px">
+          <button class="btn btn-neutral" onclick="onClearFlags()">Clear sticky flags</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- confirm dialog -->
+  <div class="overlay" id="confirmOverlay" hidden onclick="confirmCancel()">
+    <div class="dialog" onclick="event.stopPropagation()">
+      <div class="dialog-title" id="confirmTitle"></div>
+      <div class="dialog-msg" id="confirmMsg"></div>
+      <div class="dialog-actions">
+        <button class="btn btn-cancel" onclick="confirmCancel()">Cancel</button>
+        <button class="btn btn-confirm" id="confirmYes" onclick="confirmYes()">Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- toast -->
+  <div class="toast-wrap" id="toastWrap" hidden>
+    <div class="toast" id="toast">
+      <span class="toast-dot" id="toastDot"></span>
+      <span class="toast-msg" id="toastMsg"></span>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+"use strict";
+
+// design-key -> API field name
+var API = {
+  frcTarget:'frcTarget', asc:'asc',
+  altitude:'altitude', usePressure:'usePressure', pressure:'pressure', tOffset:'tempOffset', tSlope:'tempSlope',
+  vocOffset:'vocIdxOff', vocLearnOffset:'vocLearnOff', vocLearnGain:'vocLearnGain', vocGating:'vocGateMax', vocStd:'vocStdInit', vocGain:'vocGain',
+  noxOffset:'noxIdxOff', noxLearnOffset:'noxLearnOff', noxGating:'noxGateMax', noxGain:'noxGain',
+  persistVoc:'vocPersist'
+};
+var BOOLS = { asc:1, usePressure:1, persistVoc:1 };
+
+var SECTIONS = {
+  co2: { keys:['frcTarget','asc'],                                                        btn:'saveCo2' },
+  env: { keys:['altitude','usePressure','pressure','tOffset','tSlope'],                   btn:'saveEnv' },
+  voc: { keys:['vocOffset','vocLearnOffset','vocLearnGain','vocGating','vocStd','vocGain','persistVoc'], btn:'saveVoc' },
+  nox: { keys:['noxOffset','noxLearnOffset','noxGating','noxGain'],                        btn:'saveNox' }
+};
+
+// [key, label, sub, min, max, step]
+var CO2_FIELDS  = [['frcTarget','FRC target','ppm · 0–2000 · default 420',0,2000,1]];
+var ENV_TOP     = [['altitude','Altitude','m · 0–3000',0,3000,1]];
+var ENV_REST    = [
+  ['pressure','Ambient pressure','hPa · 700–1200',700,1200,1],
+  ['tOffset','Temperature offset','°C · −10…10',-10,10,0.1],
+  ['tSlope','Temperature slope','−1…1',-1,1,0.001]
+];
+var VOC_FIELDS  = [
+  ['vocOffset','Index offset','1–250 · default 100',1,250,1],
+  ['vocLearnOffset','Learning time offset','h · 1–1000 · default 12',1,1000,1],
+  ['vocLearnGain','Learning time gain','h · 1–1000 · default 12',1,1000,1],
+  ['vocGating','Gating max duration','min · 0–3000 · default 180',0,3000,1],
+  ['vocStd','Std initial','10–5000 · default 50',10,5000,1],
+  ['vocGain','Gain factor','1–1000 · default 230',1,1000,1]
+];
+var NOX_FIELDS  = [
+  ['noxOffset','Index offset','1–250 · default 1',1,250,1],
+  ['noxLearnOffset','Learning time offset','h · 1–1000 · default 12',1,1000,1],
+  ['noxGating','Gating max duration','min · 0–3000 · default 720',0,3000,1],
+  ['noxGain','Gain factor','1–1000 · default 230',1,1000,1]
+];
+
+var TOGGLES = {
+  asc:        { track:'ascToggle',  knob:'ascKnob'  },
+  usePressure:{ track:'presToggle', knob:'presKnob' },
+  persistVoc: { track:'pvToggle',   knob:'pvKnob'   }
+};
+
+var FLAG_DEFS = [
+  ['Fan','fan'], ['RHT','rht'], ['Gas','gas'], ['CO₂ A','co2a'],
+  ['CO₂ B','co2b'], ['PM','pm'], ['Fan speed','speed']
+];
+
+var values = {}, saved = {}, inputs = {}, busy = false, pendingConfirm = null, toastTimer = null;
+
+function el(id){ return document.getElementById(id); }
+
+// ---- build number-field rows ----
+function buildFields(containerId, defs){
+  var c = el(containerId);
+  defs.forEach(function(f){
+    var key = f[0];
+    var row = document.createElement('div'); row.className = 'row';
+    var labels = document.createElement('div'); labels.className = 'row-labels';
+    var l = document.createElement('span'); l.className = 'row-label'; l.textContent = f[1];
+    var s = document.createElement('span'); s.className = 'row-sub'; s.textContent = f[2];
+    labels.appendChild(l); labels.appendChild(s);
+    var inp = document.createElement('input');
+    inp.type = 'number'; inp.className = 'num';
+    inp.min = f[3]; inp.max = f[4]; inp.step = f[5];
+    inp.addEventListener('input', function(){
+      values[key] = inp.value === '' ? '' : Number(inp.value);
+      refreshDirty();
+    });
+    inputs[key] = inp;
+    row.appendChild(labels); row.appendChild(inp);
+    c.appendChild(row);
+  });
+}
+
+// ---- dirty tracking ----
+function dirty(keys){ return keys.some(function(k){ return values[k] !== saved[k]; }); }
+function refreshDirty(){
+  Object.keys(SECTIONS).forEach(function(name){
+    var sec = SECTIONS[name];
+    el(sec.btn).disabled = !dirty(sec.keys);
+  });
+}
+
+// ---- apply state to DOM ----
+function applyValues(){
+  Object.keys(inputs).forEach(function(k){
+    if (document.activeElement !== inputs[k]) inputs[k].value = values[k];
+  });
+  Object.keys(TOGGLES).forEach(function(k){
+    var t = TOGGLES[k], on = !!values[k];
+    el(t.track).style.background = on ? '#4f7ea8' : '#2c3b4e';
+    el(t.knob).style.transform = 'translateX(' + (on ? '18px' : '0px') + ')';
+  });
+  inputs.pressure.disabled = !values.usePressure;
+  refreshDirty();
+}
+
+function toggleKey(k){ values[k] = !values[k]; applyValues(); }
+
+// ---- toast ----
+function showToast(type, msg){
+  clearTimeout(toastTimer);
+  var err = type === 'error';
+  el('toastMsg').textContent = msg;
+  el('toastDot').style.background = err ? '#e06e5b' : '#4fc98f';
+  el('toast').style.borderColor = err ? 'rgba(224,110,91,.4)' : 'rgba(79,201,143,.35)';
+  el('toastWrap').hidden = false;
+  toastTimer = setTimeout(function(){ el('toastWrap').hidden = true; }, 3000);
+}
+
+// ---- settings load / resync ----
+function resync(adopt){ // adopt: array of keys to overwrite from server, or null for all
+  return fetch('/api/settings').then(function(r){ return r.json(); }).then(function(j){
+    Object.keys(API).forEach(function(k){
+      var v = j[API[k]];
+      if (v === undefined) return;
+      saved[k] = v;
+      if (!adopt || adopt.indexOf(k) >= 0) values[k] = v;
+    });
+    applyValues();
+  });
+}
+
+// ---- save a section ----
+function saveSection(name){
+  var sec = SECTIONS[name];
+  if (busy || !dirty(sec.keys)) return;
+  var btn = el(sec.btn);
+  btn.disabled = true;
+  var body = new URLSearchParams();
+  sec.keys.forEach(function(k){
+    var v = values[k];
+    if (v === '' || v === null || v === undefined) return; // skip blanks -> firmware keeps current
+    if (BOOLS[k]) v = v ? 1 : 0;
+    body.set(API[k], v);
+  });
+  fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: body })
+    .then(function(r){ return r.json().then(function(j){ return { ok:r.ok, j:j }; }); })
+    .then(function(res){
+      if (res.ok && res.j.ok) { showToast('success', 'Settings saved'); return resync(sec.keys); }
+      showToast('error', (res.j && res.j.error) || 'Save failed');
+      refreshDirty();
+    })
+    .catch(function(){ showToast('error', 'Request failed'); refreshDirty(); });
+}
+
+// ---- commands ----
+function setBusy(btnId, spinId, labelId, on, label){
+  if (!btnId) return; // action buttons without spinner (e.g. clear flags)
+  el(btnId).disabled = on;
+  el(spinId).hidden = !on;
+  el(labelId).textContent = label;
+}
+
+function runCmd(cmd, ui, timeoutMs, onOk){
+  if (busy) return;
+  busy = true;
+  setBusy(ui.btn, ui.spin, ui.label, true, 'Working…');
+  var ctrl = new AbortController();
+  var to = setTimeout(function(){ ctrl.abort(); }, timeoutMs);
+  var body = new URLSearchParams(); body.set('cmd', cmd);
+  fetch('/api/cmd', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: body, signal: ctrl.signal })
+    .then(function(r){ return r.json().then(function(j){ return { ok:r.ok, j:j }; }); })
+    .then(function(res){
+      if (res.ok && res.j.ok) onOk(res.j);
+      else showToast('error', (res.j && res.j.error) || 'Command failed');
+    })
+    .catch(function(){ showToast('error', 'Request failed'); })
+    .then(function(){
+      clearTimeout(to); busy = false;
+      setBusy(ui.btn, ui.spin, ui.label, false, ui.def);
+    });
+}
+
+function onFrc(){
+  runCmd('frc', { btn:'frcBtn', spin:'frcSpin', label:'frcLabel', def:'Recalibrate now' }, 30000, function(j){
+    showToast('success', 'FRC complete · correction ' + j.correction + ' ppm');
+  });
+}
+function onFan(){
+  runCmd('fan', { btn:'fanBtn', spin:'fanSpin', label:'fanLabel', def:'Clean now' }, 45000, function(){
+    showToast('success', 'Fan cleaning complete'); loadDevice();
+  });
+}
+function onHeater(){
+  runCmd('heater', { btn:'heatBtn', spin:'heatSpin', label:'heatLabel', def:'Run cycle' }, 45000, function(){
+    showToast('success', 'Heater cycle complete'); loadDevice();
+  });
+}
+function onClearFlags(){
+  runCmd('clear_status', { btn:null, spin:null, label:null }, 15000, function(){
+    showToast('success', 'Sticky flags cleared'); loadDevice();
+  });
+}
+
+// ---- confirm dialog ----
+function openConfirm(title, msg, label, fn){
+  el('confirmTitle').textContent = title;
+  el('confirmMsg').textContent = msg;
+  el('confirmYes').textContent = label;
+  pendingConfirm = fn;
+  el('confirmOverlay').hidden = false;
+}
+function confirmCancel(){ pendingConfirm = null; el('confirmOverlay').hidden = true; }
+function confirmYes(){ var fn = pendingConfirm; pendingConfirm = null; el('confirmOverlay').hidden = true; if (fn) fn(); }
+
+function askCo2Reset(){
+  openConfirm('CO₂ factory reset?',
+    'All FRC and ASC corrections will be discarded and the CO₂ sensor returns to factory calibration. This cannot be undone.',
+    'Reset', function(){
+      runCmd('co2_factory_reset', { btn:null }, 30000, function(){
+        showToast('success', 'CO₂ calibration reset to factory'); resync(null);
+      });
+    });
+}
+function askVocReset(){
+  openConfirm('Reset VOC learning?',
+    'The VOC baseline learned over the past days will be cleared. The index will need ~12 h to settle again.',
+    'Reset', function(){
+      runCmd('voc_reset', { btn:null }, 30000, function(){
+        showToast('success', 'VOC learning cleared'); resync(null);
+      });
+    });
+}
+function askResetAll(){
+  openConfirm('Reset all learning?',
+    'VOC and NOx learning states are cleared and their tuning parameters return to defaults. Indexes will need up to 24 h to settle again.',
+    'Reset all', function(){
+      runCmd('reset_learning', { btn:null }, 30000, function(){
+        showToast('success', 'All learning states cleared'); resync(null);
+      });
+    });
+}
+
+// ---- device panel ----
+var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function pad2(n){ return (n < 10 ? '0' : '') + n; }
+function fmtDate(epoch){
+  if (!epoch) return 'never';
+  var d = new Date(epoch * 1000);
+  return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear() + ' · ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+function fmtRssi(v){ return String(v).replace('-', '−') + ' dBm'; }
+function fmtUptime(s){
+  var d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  return (d > 0 ? d + 'd ' : '') + h + 'h ' + m + 'm';
+}
+
+function loadDevice(){
+  return fetch('/api/device').then(function(r){ return r.json(); }).then(function(d){
+    var rows = [
+      ['Product', d.product], ['Serial', d.serial], ['Firmware', d.fw],
+      ['IP', d.ip], ['Wi-Fi RSSI', fmtRssi(d.rssi)],
+      ['Free heap', Math.round(d.heap / 1024) + ' kB'], ['Uptime', fmtUptime(d.uptimeS)]
+    ];
+    var rc = el('deviceRows'); rc.innerHTML = '';
+    rows.forEach(function(r){
+      var row = document.createElement('div'); row.className = 'dev-row';
+      var k = document.createElement('span'); k.className = 'dev-k'; k.textContent = r[0];
+      var v = document.createElement('span'); v.className = 'dev-v'; v.textContent = r[1];
+      row.appendChild(k); row.appendChild(v); rc.appendChild(row);
+    });
+    var fg = el('flagGrid'); fg.innerHTML = '';
+    var flags = d.flags || {};
+    FLAG_DEFS.forEach(function(f){
+      var err = !!flags[f[1]];
+      var chip = document.createElement('div'); chip.className = 'flag';
+      var dot = document.createElement('span'); dot.className = 'flag-dot';
+      dot.style.background = err ? '#e06e5b' : '#4fc98f';
+      var name = document.createElement('span'); name.className = 'flag-name'; name.textContent = f[0];
+      chip.appendChild(dot); chip.appendChild(name); fg.appendChild(chip);
+    });
+    el('fanSub').textContent  = 'Last run ' + fmtDate(d.lastFan)  + ' — runs weekly automatically, ~15 s, measurement pauses';
+    el('heatSub').textContent = 'Last run ' + fmtDate(d.lastHeat) + ' — runs monthly automatically, ~25 s';
+  }).catch(function(){});
+}
+
+// ---- init ----
+buildFields('co2Fields', CO2_FIELDS);
+buildFields('envTop', ENV_TOP);
+buildFields('envRest', ENV_REST);
+buildFields('vocFields', VOC_FIELDS);
+buildFields('noxFields', NOX_FIELDS);
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') confirmCancel(); });
+
+resync(null).catch(function(){ showToast('error', 'Failed to load settings'); });
+loadDevice();
+</script>
+</body>
+</html>
+)HTMLDOC";

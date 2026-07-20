@@ -28,7 +28,7 @@
 ```json
 {"state":"online","ageMs":123456,"co2":620,"temp":22.4,"hum":46.0,
  "pm1":3.1,"pm25":4.2,"pm4":5.0,"pm10":6.8,"voc":87,"nox":12,
- "faultFlags":0,"room":"Living room"}
+ "faultFlags":0}
 ```
 `state` ∈ `online|warmup|calibrating|fault` (BOOT è riportato come `warmup`; `offline` lo decide il client). Campi non validi = `null`. `faultFlags` = registro stato SEN66 (uint32).
 
@@ -131,8 +131,7 @@ static void handleApiData() {
     jsonNum(s, "pm10", latest.pm10, 1);
     jsonNum(s, "voc",  latest.voc, 0);
     jsonNum(s, "nox",  latest.nox, 0);
-    s += "\"faultFlags\":"; s += String(deviceStatusRaw); s += ',';
-    s += "\"room\":\"Living room\"}";     // Task 3 lo rende configurabile
+    s += "\"faultFlags\":"; s += String(deviceStatusRaw); s += '}';
     server.send(200, "application/json", s);
 }
 ```
@@ -256,7 +255,6 @@ Registra `server.on("/api/history", HTTP_GET, handleApiHistory);` in `setup()`.
 
 ```cpp
 struct Settings {
-    char     room[32]    = "Living room";
     uint16_t altitude    = 120;      // m, 0-3000 (default = SENSOR_ALTITUDE_M)
     bool     usePressure = false;    // true: ambient pressure overrides altitude
     uint16_t pressure    = 1013;     // hPa, 700-1200
@@ -272,7 +270,6 @@ struct Settings {
 static Settings cfg;
 
 static void loadSettings() {
-    prefs.getString("room", cfg.room, sizeof cfg.room);
     cfg.altitude    = prefs.getUShort("alt",      cfg.altitude);
     cfg.usePressure = prefs.getBool  ("usePress", cfg.usePressure);
     cfg.pressure    = prefs.getUShort("press",    cfg.pressure);
@@ -293,7 +290,6 @@ static void loadSettings() {
     cfg.noxGain     = prefs.getShort ("noxGain",   cfg.noxGain);
 }
 static void saveSettings() {
-    prefs.putString("room", cfg.room);
     prefs.putUShort("alt", cfg.altitude);      prefs.putBool("usePress", cfg.usePressure);
     prefs.putUShort("press", cfg.pressure);
     prefs.putFloat("tOff", cfg.tempOffset);    prefs.putFloat("tSlope", cfg.tempSlope);
@@ -335,11 +331,11 @@ static void applyAnyStateSettings() {
 }
 ```
 
-In `startSensor()`, sostituisci la riga `setSensorAltitude(SENSOR_ALTITUDE_M)` con `applyIdleSettings(); applyAnyStateSettings();` (prima di `startContinuousMeasurement`). In `setup()`, chiama `loadSettings()` subito dopo `prefs.begin(...)`. Rimuovi la costante `SENSOR_ALTITUDE_M` (il default vive in `Settings`). In `handleApiData()` usa `cfg.room` (escapare `"` e `\` copiando in un buffer con `\"`).
+In `startSensor()`, sostituisci la riga `setSensorAltitude(SENSOR_ALTITUDE_M)` con `applyIdleSettings(); applyAnyStateSettings();` (prima di `startContinuousMeasurement`). In `setup()`, chiama `loadSettings()` subito dopo `prefs.begin(...)`. Rimuovi la costante `SENSOR_ALTITUDE_M` (il default vive in `Settings`). Nessun concetto di "room" nel progetto: se `handleApiData()` contiene ancora un campo `room`, rimuovilo.
 
 - [ ] **Step 3: Endpoint GET/POST**
 
-GET serializza tutti i campi con le stesse chiavi accettate dal POST. Parsing POST completo (nomi campo = chiavi JSON del GET; bool come `0/1`):
+GET serializza tutti i campi con le stesse chiavi accettate dal POST: `altitude, usePressure, pressure, tempOffset, tempSlope, vocPersist, asc, frcTarget, vocIdxOff, vocLearnOff, vocLearnGain, vocGateMax, vocStdInit, vocGain, noxIdxOff, noxLearnOff, noxGateMax, noxGain`. Nel GET i bool sono JSON `true/false`; nel POST (form-urlencoded) i bool si inviano come `0/1`. Le funzioni `applyIdleSettings`/`applyAnyStateSettings` restituiscono `bool` (AND dei `check()`); se l'applicazione fallisce il POST risponde 500 `{"ok":false,"error":"sensor rejected settings"}` come richiesto dalla spec (sezione Gestione errori). Parsing POST completo:
 
 ```cpp
 // Parse helpers: absent arg = keep current value; out-of-range = reject.
@@ -387,7 +383,6 @@ static void handleApiSettingsPost() {
     argB("usePressure", c.usePressure);
     argB("vocPersist",  c.vocPersist);
     argB("asc",         c.asc);
-    if (server.hasArg("room")) strlcpy(c.room, server.arg("room").c_str(), sizeof c.room);
     if (!ok) { sendErr(400, ("invalid " + bad).c_str()); return; }
 
     // Idle-only commands needed only if one of these actually changed.
@@ -518,10 +513,9 @@ static void handleApiCmd() {
         restartAfterDeviceReset();
         sendOk();
     } else if (cmd == "reset_learning") {
-        // Tuning back to defaults + learning wiped; room and maintenance dates kept.
+        // Tuning back to defaults + learning wiped; maintenance dates kept.
         publishStatusText("Resetting learning...");
         Settings fresh;
-        strlcpy(fresh.room, cfg.room, sizeof fresh.room);
         cfg = fresh;
         saveSettings();
         prefs.remove("vocState");
@@ -598,7 +592,7 @@ Nota: `getProductName`/`getSerialNumber`/`getVersion` sono lette a ogni richiest
 
 - [ ] **Step 1: `dev/dashboard.html`**
 
-Porta `docs/design/air-dashboard-v2.dc.html` a HTML/JS vanilla. Regole di porting:
+Porta `docs/design/air-dashboard-v2.dc.html` (mobile) a HTML/JS vanilla; per il layout desktop il mockup autoritativo è `docs/design/air-dashboard-desktop.dc.html`. Il titolo dell'header è fisso: "Air Sensor" (mai nomi di stanza). Regole di porting:
 - Gli stili inline del design diventano classi CSS in un `<style>` (stessi valori esatti); `style-hover` → `:hover`; la direttiva `sc-if` → `hidden`/render condizionale JS; `sc-for` → template JS.
 - Le funzioni `co2Band`, `pm25Band`, `idxBand`, la mappa `states`, `chart(pts,color)` e `gaugeEl(v,color)` si portano 1:1 (da `React.createElement` a costruzione SVG via template string), inclusi i binding NOx `idxBand(nox*3)` e le percentuali barre (`pm25/55`, `voc/500`, `nox/150`, `(temp-10)/25`, `hum`).
 - `series()` (dati finti) NON si porta: il grafico usa `/api/history`.
@@ -635,7 +629,7 @@ function faultInfo(flags) {
 }
 ```
 
-- Desktop `@media (min-width:700px)`: container `max-width:920px`, layout `grid-template-columns: 1fr 1fr` (gauge CO₂ a sinistra a tutta altezza; a destra le righe inquinanti/comfort/particulate); il bottom-sheet diventa dialog centrato (`align-items:center`, border-radius pieno 22px, max-width 430px).
+- Desktop `@media (min-width:700px)`: replica `docs/design/air-dashboard-desktop.dc.html` (stessa pagina, layout che si riorganizza via CSS; il bottom-sheet diventa dialog centrato).
 - Footer: link discreto `Maintenance` → `/admin` (font 11px, colore `#5a6675`).
 - `<link>` Google Fonts con `onerror` silenzioso; `font-family` sempre con fallback.
 
@@ -654,8 +648,7 @@ def data():
     return {"state": STATE, "ageMs": 7_200_000,
             "co2": int(620 + 40 * math.sin(t / 60)), "temp": 22.4, "hum": 46.0,
             "pm1": 3.1, "pm25": 4.2, "pm4": 5.0, "pm10": 6.8,
-            "voc": 87, "nox": 12, "faultFlags": 16 if STATE == 'fault' else 0,
-            "room": "Living room"}
+            "voc": 87, "nox": 12, "faultFlags": 16 if STATE == 'fault' else 0}
 
 def history():
     series = {}
@@ -738,15 +731,14 @@ Con il mock server attivo, controlla a occhio su `http://localhost:8000/`: gauge
 
 - [ ] **Step 1: `dev/admin.html`**
 
-Stesso `<style>` di base della dashboard (palette, font, card). Header con titolo "Maintenance" + link `← Dashboard`. Sezioni (una card ciascuna, titoletto uppercase 11px come "Particulate detail"):
+Mockup autoritativi: `docs/design/air-admin.dc.html` (mobile) e `docs/design/air-admin-desktop.dc.html` (desktop) — replicali per layout, copy e componenti (senza alcun riferimento a nomi di stanza). Stesso `<style>` di base della dashboard (palette, font, card). Contenuto funzionale richiesto (deve coincidere coi mockup; in caso di divergenza vincono i mockup):
 
 1. **CO₂ calibration** — numero `frcTarget` (0–2000, default 420) + bottone `Recalibrate now` (conferma via `confirm()`; mostra la correzione ppm restituita o l'errore 409 "run >= 3 min first"); toggle ASC; bottone `CO₂ factory reset` (rosso, doppio `confirm()`).
 2. **Environment compensation** — numero altitude (0–3000 m); toggle `Use ambient pressure`; numero pressure (700–1200 hPa, abilitato solo con toggle on); numeri tempOffset (−10…10 °C, step 0.1) e tempSlope (−1…1, step 0.001).
 3. **VOC tuning** — 6 numeri con range/default nei label (`indexOffset 1–250 · default 100`, ecc.); in fondo: toggle `Persist VOC learning` + bottone `Reset VOC learning` (conferma).
 4. **NOx tuning** — 4 numeri (indexOffset def 1, learningTimeOffsetHours def 12, gatingMaxDurationMinutes def 720, gainFactor def 230).
-5. **Maintenance** — bottoni `Clean fan now` (~15 s), `SHT heater cycle` (~25 s), `Reset all learning` (rosso, conferma); date `lastFan`/`lastHeat` formattate da epoch (0 → `never`).
-6. **General** — testo `room` (max 31 char).
-7. **Device** (sola lettura) — product/serial/fw, griglia flag con dot verde/rosso (fan, rht, gas, co2a, co2b, pm, speed), rssi, ip, heap, uptime; bottone `Clear sticky flags`.
+5. **Maintenance** — bottoni `Clean fan now` (~15 s), `SHT heater cycle` (~25 s), `Reset all learning` (rosso, conferma); date `lastFan`/`lastHeat` formattate da epoch (0 → `never`); nota che fan/heater girano comunque in automatico (settimanale/mensile).
+6. **Device** (sola lettura) — product/serial/fw, griglia flag con dot verde/rosso (fan, rht, gas, co2a, co2b, pm, speed), rssi, ip, heap, uptime; bottone `Clear sticky flags`.
 
 Comportamento JS: al load `GET /api/settings` + `GET /api/device` e popola; ogni sezione con campi ha un bottone `Save` che POSTa SOLO i campi della sezione (`URLSearchParams`); i bottoni azione POSTano `/api/cmd`. Durante un'azione: bottone disabilitato con testo `Working…`; esito come toast in basso (verde ok / rosso errore con messaggio del firmware). I toggle sono switch CSS (stile pill del design). Bottoni: default bordo `#2c3b4e` su `#18202b`; distruttivi testo `#e06e5b` bordo `rgba(224,110,91,.4)`.
 

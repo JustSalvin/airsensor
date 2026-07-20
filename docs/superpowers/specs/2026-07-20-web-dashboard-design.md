@@ -11,6 +11,11 @@ fedelmente il design Claude Design **"Air Dashboard v2.dc.html"** (progetto
 `e7167602-ca9e-459a-bb16-5a86cfe13c75`), più un pannello `/admin` completo per
 calibrazione e manutenzione del SEN66, nello stesso stile visivo.
 
+Mockup autoritativi (stesso progetto Claude Design, copie in `docs/design/`):
+"Air Dashboard v2" (mobile), "Air Dashboard Desktop", "Air Admin" (mobile),
+"Air Admin Desktop". Dove questa spec e i mockup divergono su layout/copy,
+vincono i mockup — eccetto: nessun nome stanza (titoli fissi "Air Sensor").
+
 ## Non-obiettivi (esclusioni esplicite)
 
 - **Nessuna notifica push** di alcun tipo (PWA push impossibile su HTTP;
@@ -57,8 +62,8 @@ mDNS: il dispositivo risponde a `http://airsensor.local`.
 Implementazione fedele del mockup v2 (dark `#0d1117`, card `#141b24`,
 IBM Plex Sans/Mono da Google Fonts con fallback system-ui):
 
-- Header: nome stanza (configurabile da `/admin`, default "Living room"),
-  "Updated X s ago", pill di stato.
+- Header: titolo fisso "Air Sensor" (nessun concetto di "stanza" nel
+  progetto: sensore unico), "Updated X s ago", pill di stato.
 - Stati pill: `online` (READY), `warmup` (WARMUP), `calibrating`
   (GAS_CALIBRATION), `fault` (FAULT); `offline` è deciso dal client quando
   il fetch fallisce o i dati sono stantii.
@@ -102,8 +107,7 @@ Stesso linguaggio visivo della dashboard. Sezioni:
 5. **Manutenzione** — pulizia ventola, ciclo SHT heater, reset learning
    completo (deviceReset + wipe Preferences di tuning, con conferma);
    date ultima esecuzione fan/heater.
-6. **Generale** — nome stanza.
-7. **Device info** (sola lettura) — product name, seriale, firmware,
+6. **Device info** (sola lettura) — product name, seriale, firmware,
    flag errore (fan, RHT, gas, CO₂×2, PM, fan speed warning) con pulsante
    "clear sticky flags", RSSI, IP, heap libero, uptime.
 
