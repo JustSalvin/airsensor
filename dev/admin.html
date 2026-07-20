@@ -20,11 +20,14 @@
   .wrap{min-height:100vh;display:flex;justify-content:center;background:#0d1117}
   .page{width:100%;max-width:430px;padding:20px 18px 40px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
 
-  .header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}
+  .header{display:flex;align-items:center;gap:12px;margin-bottom:4px}
   .header-titles{display:flex;flex-direction:column;gap:2px}
   .title{font-size:16px;font-weight:600;letter-spacing:.01em}
   .subtitle{font-size:11.5px;color:#7a8595}
-  .back{font-size:12.5px;padding:6px 0}
+
+  .iconbtn{width:34px;height:34px;border-radius:50%;background:#141b24;border:1px solid #1f2937;display:flex;align-items:center;justify-content:center;flex:none}
+  .iconbtn:hover{border-color:#2c3b4e;background:#18202b}
+  .iconbtn:hover svg{stroke:#c2ccd8}
 
   .body{display:flex;flex-direction:column;gap:14px}
   .col{display:flex;flex-direction:column;gap:14px}
@@ -95,11 +98,16 @@
 <div class="page">
 
   <div class="header">
+    <a class="iconbtn" href="/" aria-label="Back to dashboard">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#7a8595" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="13" y1="8" x2="3" y2="8"></line>
+        <polyline points="7,4 3,8 7,12"></polyline>
+      </svg>
+    </a>
     <div class="header-titles">
       <div class="title">Maintenance</div>
       <div class="subtitle">SEN66</div>
     </div>
-    <a class="back" href="/">&larr; Dashboard</a>
   </div>
 
   <div class="body">
